@@ -1,0 +1,43 @@
+services:
+  navidrome:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: navidrome-mpv
+    container_name: navidrome
+    user: "1000:1000"               # заміни за потреби
+    environment:
+      TZ: Europe/Kyiv
+      ND_MUSICFOLDER: /music
+      ND_DATAFOLDER: /data
+      ND_LOGLEVEL: debug
+      ND_JUKEBOX_ENABLED: "true"
+      ND_JUKEBOX_ADMINONLY: "false"
+      # Підлаштуй свій ALSA-девайс (приклад нижче для USB-карти)
+      ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' ${INPUT}"
+    ports:
+      - "4533:4533"
+    volumes:
+      - /big/Muz:/music:ro           # твоя колекція
+      - /nvme1/navidrome:/data       # дата/кеш
+      - ./navidrome.toml:/data/navidrome.toml:ro
+    devices:
+      - /dev/snd:/dev/snd
+    group_add:
+      - "29"                         # gid групи audio (перевір у себе)
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine
+    container_name: jukebox-web
+    depends_on:
+      - navidrome
+    ports:
+      - "8080:80"
+    volumes:
+      # --- FIXED: Mount the built 'dist' folder to the Nginx root ---
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
+    # command не обов'язковий — дефолт уже запускає nginx у foreground
+    # command: ["nginx","-g","daemon off;"]
+    restart: unless-stopped
