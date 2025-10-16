@@ -34,7 +34,7 @@ services:
       - navidrome
     ports:
       - "8080:80"
-      - "8443:443"
+      - "8443:443" #якась хуйня?
     volumes:
       # --- FIXED: Mount the built 'dist' folder to the Nginx root ---
       - ./dist:/usr/share/nginx/html:ro
