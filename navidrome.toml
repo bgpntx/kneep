@@ -37,3 +37,8 @@ Scanner.Schedule = "@every 24h"
 # Кеші
 ImageCacheSize = "100MiB"
 TranscodingCacheSize = "100MiB"
+[LastFM]
+Enabled = true
+ApiKey = "113357f159bdbb79ff3b026ec138cfb4"
+Secret = "8d17b44fc1fd5becbb75c3dca056e397"
+Language = "en"  # optional
