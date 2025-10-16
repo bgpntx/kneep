@@ -39,7 +39,8 @@ services:
       # --- FIXED: Mount the built 'dist' folder to the Nginx root ---
       - ./dist:/usr/share/nginx/html:ro
       - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /nvme1/jellyfin/ssl:/etc/nginx/ssl:ro
+      - /etc/letsencrypt/archive/nest.vps.pw/fullchain3.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/archive/nest.vps.pw/privkey3.pem:/etc/nginx/ssl/privkey.pem:ro
     # Note: Ensure the Nginx config file (nginx.default.conf) references these environment variables or directly points to these paths for SSL to work
     environment:
       SSL_CERTIFICATE: /etc/nginx/ssl/fullchain.pem
