@@ -38,6 +38,11 @@ services:
       # --- FIXED: Mount the built 'dist' folder to the Nginx root ---
       - ./dist:/usr/share/nginx/html:ro
       - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /nvme1/jellyfin/ssl:/etc/nginx/ssl:ro
+    # Note: Ensure the Nginx config file (nginx.default.conf) references these environment variables or directly points to these paths for SSL to work
+    environment:
+      SSL_CERTIFICATE: /etc/nginx/ssl/fullchain.pem
+      SSL_CERTIFICATE_KEY: /etc/nginx/ssl/privkey.pem
     # command не обов'язковий — дефолт уже запускає nginx у foreground
     # command: ["nginx","-g","daemon off;"]
     restart: unless-stopped
