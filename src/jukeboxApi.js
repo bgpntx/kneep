@@ -7,7 +7,7 @@ const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === tr
 
 // Global configuration state
 let config = JSON.parse(localStorage.getItem('jukeboxConfig')) || {
-    serverUrl: 'http://localhost:4533',
+    serverUrl: '',
     username: '',
     token: '',
     salt: ''

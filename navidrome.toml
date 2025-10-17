@@ -28,6 +28,7 @@ MPVCmdTemplate = "mpv --no-video --audio-device=%d --input-ipc-server=%s %f"
 SessionTimeout = "48h"
 EnableDownloads = true
 EnableExternalServices = true
+EnableCORS = true
 
 # Налаштування сканера бібліотек
 Scanner.Schedule = "@every 24h"
