@@ -600,3 +600,46 @@ html, body {
     font-size: 18px; /* Prevents zoom on iOS */
   }
 }
+
+// Attach simple toggles for the per-item "more" menus
+function initQueueMoreMenus() {
+  // guard
+  if (typeof document === 'undefined') return;
+
+  // delegate: handle click on any .btn.more
+  document.addEventListener('click', (e) => {
+    const more = e.target.closest('.qi-actions .btn.more, .qi-actions .btn.more *');
+    if (more) {
+      // find parent .qi-actions
+      const actions = more.closest('.qi-actions');
+      // toggle open state
+      actions.classList.toggle('open');
+      // stop propagation so the document click handler doesn't immediately close it
+      e.stopPropagation();
+      return;
+    }
+
+    // click outside: close any open menus
+    document.querySelectorAll('.qi-actions.open').forEach((el) => el.classList.remove('open'));
+  });
+
+  // close menus on ESC and support keyboard opening (Enter/Space)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.qi-actions.open').forEach((el) => el.classList.remove('open'));
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      const focused = document.activeElement;
+      if (focused && focused.matches('.qi-actions .btn.more')) {
+        focused.closest('.qi-actions')?.classList.toggle('open');
+        e.preventDefault();
+      }
+    }
+  });
+}
+
+// Call once app mounted / DOM ready
+if (typeof window !== 'undefined') {
+  // If using React, move this call into a useEffect in the component that renders the queue
+  window.requestAnimationFrame(initQueueMoreMenus);
+}
