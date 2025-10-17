@@ -61,34 +61,13 @@ export default function App() {
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
-
-    // Missing app-level state and refs (prevented runtime ReferenceError)
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [configForm, setConfigForm] = useState({ serverUrl: '', username: '', password: '' });
     const [searchResults, setSearchResults] = useState([]);
 
-    // refs used to coordinate async commands and to give stable access to latest state
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
-    // keep stateRef up-to-date
     useEffect(() => { stateRef.current = state; }, [state]);
-
-    // lightweight control handler — adapt to your existing handlers.
-    // Emits a CustomEvent 'jukebox-add-random' when dice pressed so you can listen elsewhere.
-    function handleControl(action) {
-        if (action === 'togglePlay') {
-            setState(s => ({ ...s, playing: !s.playing }));
-            return;
-        }
-        if (action === 'addRandom') {
-            // app code can listen for this event and add a random track
-            window.dispatchEvent(new CustomEvent('jukebox-add-random'));
-            return;
-        }
-        // otherwise notify via CustomEvent (you can wire listeners to implement prev/next/shuffle)
-        window.dispatchEvent(new CustomEvent('jukebox-control', { detail: { action } }));
-        console.log('control:', action);
-    }
 
     // --- Media Session API Integration ---
     const updateMediaSession = useCallback((track, position, playing) => {
@@ -544,8 +523,6 @@ export default function App() {
         '--vol-fill': `${Math.round(state.gain * 100)}%`
     }), [state.gain]);
 
-    const hasMediaSession = 'mediaSession' in navigator;
-
     // --- RENDER ---
     return (
         <div className="player-shell">
@@ -558,7 +535,6 @@ export default function App() {
                 </div>
             </aside>
 
-            {/* Transport / controls (horizontal Winamp-style). Replace existing block where appropriate. */}
             <div className="transport-card">
                 <div className="controls">
                   <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
@@ -584,6 +560,22 @@ export default function App() {
                         disabled={!isAuthenticated}
                     />
                     <div className="time">{fmtTime(currentTrack?.duration || 0)}</div>
+                </div>
+
+                <div className="vol">
+                    <div className="vol-row">
+                        <div title="Volume">🔊</div>
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            value={Math.round(state.gain * 100)}
+                            style={volFillStyle}
+                            onChange={handleVolumeChange}
+                            disabled={!isAuthenticated}
+                        />
+                        <div className="volpct">{Math.round(state.gain * 100)}%</div>
+                    </div>
                 </div>
             </div>
 
