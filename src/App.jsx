@@ -63,11 +63,12 @@ export default function App() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [configForm, setConfigForm] = useState({
-        serverUrl: 'http://localnest:4533',
-        username: 'bgpntx',
+        serverUrl: '',
+        username: '',
         password: ''
     });
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
@@ -303,7 +304,7 @@ export default function App() {
         (async function init() {
             try {
                 const savedConfig = getConfig();
-                if (savedConfig.serverUrl && savedConfig.username) {
+                if (savedConfig.username) {
                     setConfigForm(savedConfig);
                     setStatusText('Reconnecting…');
                     
@@ -480,8 +481,8 @@ export default function App() {
     const handleLogin = useCallback(async () => {
         const { serverUrl, username, password } = configForm;
         
-        if (!serverUrl || !username || !password) {
-            setStatusText('Please fill in all fields');
+        if (!username || !password) {
+            setStatusText('Please enter username and password');
             return;
         }
         
@@ -674,7 +675,7 @@ export default function App() {
                     <div className="row">
                         <input 
                             id="serverUrl" 
-                            placeholder="Server URL (http://localhost:4533)"
+                            placeholder="Server URL (optional - leave empty to use nginx proxy)"
                             value={configForm.serverUrl || ''}
                             onChange={handleConfigChange}
                             disabled={isAuthenticated}
@@ -702,7 +703,7 @@ export default function App() {
                     <div className="small">
                         {isAuthenticated 
                             ? '✓ Connected to server. Your password is never stored.' 
-                            : 'Enter your Navidrome credentials. Password is never stored, only used to generate secure tokens.'}
+                            : '💡 Tip: Leave Server URL empty if using the built-in nginx proxy. Only fill it if connecting to a different Navidrome server.'}
                     </div>
                 </div>
             </aside>
