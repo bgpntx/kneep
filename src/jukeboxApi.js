@@ -326,14 +326,17 @@ export function getConfig() {
  * @returns {Promise<Object>} config with token/salt
  */
 export async function authenticate(serverUrl, username, password) {
-    if (!serverUrl || !username || !password) {
-        throw new Error('Server URL, username, and password are required');
+    if (!username || !password) {
+        throw new Error('Username and password are required');
     }
+    
+    // Allow empty serverUrl for relative URLs
+    serverUrl = serverUrl || '';
     
     // Generate new salt and token
     const salt = generateSalt();
     const token = generateToken(password, salt);
-    
+        
     // Test authentication with ping
     const testUrl = `${serverUrl}/rest/ping?u=${encodeURIComponent(username)}&t=${token}&s=${salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
     
