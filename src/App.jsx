@@ -562,12 +562,11 @@ export default function App() {
             <div className="transport-card">
                 <div className="controls">
                   <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
-                  <button className="btn" title="Rewind" onClick={() => skipTo(state.currentIndex, Math.max(0, state.position - 10))}>⏪</button>
                   <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
                     {state.playing ? '⏸' : '▶'}
                   </button>
                   <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
-                  <button className="btn" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
+                  <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
                   <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
                 </div>
 

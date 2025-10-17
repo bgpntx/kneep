@@ -73,6 +73,20 @@
   box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
 }
 
+/* ensure shuffle uses the standard button visuals (matches other transport buttons) */
+.btn.shuffle {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid var(--btn-border);
+  box-shadow: var(--btn-shadow);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border-radius: var(--btn-radius);
+}
+
 /* compact variant for queue */
 .btn.compact {
   width: 36px;
@@ -116,6 +130,7 @@
 @media (max-width: 520px) {
   :root { --btn-size: 44px; --btn-primary-size: 56px; }
   .btn.compact { width: 30px; height: 30px; }
+  .btn.shuffle { width: var(--btn-size); height: var(--btn-size); }
 }
 
 /* Optional retro/flat variant (use .btn.flat) */
