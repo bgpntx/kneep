@@ -211,7 +211,17 @@ html, body {
   color: var(--green-on); /* Match queue list green color */
   text-align: center; /* Center align text */
 }
-
+.cover-card .cover {
+  width: 320px;
+  height: 320px;
+  max-width: 100%;
+  aspect-ratio: 1/1;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--playlist-bg);
+  border: 1px solid var(--text-gray);
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
+}
 /* Ensure all text in cover card uses the green color and is centered */
 .cover-card .title,
 .cover-card .artist,
@@ -220,6 +230,7 @@ html, body {
   text-align: center;
   width: 100%;
 }
+
 /* right queue area */
 .side-card {
   grid-area: queue;
@@ -311,11 +322,9 @@ html, body {
   color: var(--blue-text);                  /* #FFFFFF */
 }
 
-/* clamp title to one line for compact queue */
+/* Best-practice single-line truncation for compact queue items */
 .qitem .qi-title {
   display: block;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -327,6 +336,10 @@ html, body {
   .transport-card .btn.primary { width: 56px; height: 56px; }
   :root { --q-actions-w: 88px; --q-action-btn: 28px; }
   .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; }
+  .cover-card .cover {
+    width: 240px;
+    height: 240px;
+  }
 }
 
 /* responsive fallback (stack vertically on small screens) */
@@ -339,4 +352,8 @@ html, body {
       "queue";
   }
   .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .cover-card .cover {
+    width: 280px;
+    height: 280px;
+  }
 }
