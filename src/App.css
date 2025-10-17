@@ -330,6 +330,26 @@ html, body {
   text-overflow: ellipsis;
 }
 
+/* Make queue action buttons more visible */
+.qitem .btn {
+  background: #1a1a1a;
+  border: 1px solid var(--green-on);
+  color: var(--green-on);
+  box-shadow: inset 0 1px 0 rgba(0, 255, 0, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.qitem .btn:hover {
+  background: #2a2a2a;
+  border-color: var(--green-on);
+  box-shadow: 0 0 4px var(--green-on);
+}
+
+.qitem .btn:active {
+  background: var(--blue-bar);
+  border-color: var(--blue-text);
+  color: var(--blue-text);
+}
+
 /* responsive: reduce button size and action column on narrow screens */
 @media (max-width: 520px) {
   .transport-card .btn { width: 44px; height: 44px; }
