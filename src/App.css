@@ -218,7 +218,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--base-dark);
+  background: rgb(45, 45, 69); /* #302F4A */
   border: 1px solid var(--text-gray);
   box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
   border-radius: 2px;
