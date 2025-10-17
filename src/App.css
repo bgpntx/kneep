@@ -220,7 +220,6 @@ html, body {
   text-align: center;
   width: 100%;
 }
-
 /* right queue area */
 .side-card {
   grid-area: queue;
