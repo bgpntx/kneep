@@ -9,7 +9,7 @@
   --text-gray: #B5B5B5;   /* labels/borders */
   --blue-bar:  #000080;   /* title bar + selection */
   --blue-text: #FFFFFF;   /* title bar text */
-  --green-on:  #0fa30f;   /* active elements */
+  --green-on:  #468731;   /* active elements */
   --playlist-bg: #000000; /* playlist background */
 
   /* Map to existing tokens the rest of the CSS uses */
