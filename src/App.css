@@ -11,7 +11,6 @@
   --blue-text: #FFFFFF;   /* title bar text */
   --green-on:  #00FF00;   /* active elements */
   --playlist-bg: #000000; /* playlist background */
-  --vol-green: rgb(70, 135, 49); /* volume slider color */
 
   /* Map to existing tokens the rest of the CSS uses */
   --bg1: var(--base-dark);
@@ -170,7 +169,6 @@ html, body {
 
 /* Winamp-style 3-vertical-fields layout: controls | cover | queue */
 .player-shell {
-  display: grid;
   grid-template-columns: 200px 360px 1fr;
   grid-template-areas: "controls cover queue";
   gap: 14px;
@@ -321,48 +319,6 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Volume slider styling */
-.vol input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--vol-green) var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%));
-  cursor: pointer;
-  outline: none;
-}
-
-.vol input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid var(--vol-green);
-  cursor: grab;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.vol input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid var(--vol-green);
-  cursor: grab;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.vol input[type="range"]::-webkit-slider-thumb:active {
-  cursor: grabbing;
-}
-
-.vol input[type="range"]::-moz-range-thumb:active {
-  cursor: grabbing;
 }
 
 /* responsive: reduce button size and action column on narrow screens */
