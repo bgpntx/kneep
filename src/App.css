@@ -214,40 +214,6 @@ html, body {
   text-align: center; /* Center align text */
 }
 
-.cover {
-  width: 100%;
-  aspect-ratio: 1/1;
-  border-radius: 4px;
-  object-fit: cover;
-  background: #222636;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.meta {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.artist, .album {
-  color: var(--green-on);
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* Ensure all text in cover card uses the green color and is centered */
 .cover-card .title,
 .cover-card .artist,
@@ -256,7 +222,6 @@ html, body {
   text-align: center;
   width: 100%;
 }
-
 /* right queue area */
 .side-card {
   grid-area: queue;
@@ -269,14 +234,6 @@ html, body {
   border: 1px solid var(--text-gray);
   box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
   border-radius: 2px;
-}
-
-.side-card h3 {
-  margin: 0;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
 }
 
 /* transport controls: horizontal Winamp-like bar */
@@ -315,82 +272,58 @@ html, body {
   border: 1px solid rgba(255,255,255,0.05);
 }
 
-/* Progress section */
-.progress {
-  display: grid;
-  grid-template-columns: 48px 1fr 48px;
-  align-items: center;
+/* make the right column (queue) use vertical space better and scroll */
+.side-card {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  user-select: none;
-  width: 100%;
-  padding: 8px 0;
+  padding: 14px 18px;
+  /* ensure the queue list can scroll independently */
 }
 
-.time {
-  text-align: center;
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  font-size: 13px;
-  min-width: 48px;
+/* queue list area should take available vertical space and scroll */
+.queue-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 6px; /* avoid horizontal overlap with action buttons */
+  background: var(--playlist-bg);
 }
 
-.seek {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent) var(--seek-fill, 0%), rgba(255, 255, 255, 0.16) var(--seek-fill, 0%));
-  outline: none;
-  cursor: pointer;
-}
-
-.seek::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  cursor: grab;
-}
-
-.seek::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--accent);
-  cursor: grab;
-}
-
-.seek:active::-webkit-slider-thumb {
-  cursor: grabbing;
-}
-
-.seek:active::-moz-range-thumb {
-  cursor: grabbing;
-}
-
-/* Volume section */
-.vol {
+/* ensure each qitem is compact and consistent height */
+.qitem {
   display: grid;
-  gap: 6px;
-  align-content: center;
-  width: 100%;
-  padding: 8px 0;
-}
-
-.vol-row {
-  display: grid;
-  grid-template-columns: 28px 1fr 48px;
+  grid-template-columns: 40px 1fr var(--q-actions-w);
+  gap: 12px;
   align-items: center;
-  gap: 10px;
+  padding: 10px 8px;
+  min-height: 56px;
+  background: var(--playlist-bg);          /* #000000 */
+  border-bottom: 1px solid var(--bevel-lo);
+  color: var(--green-on);                  /* normal playlist text */
+  font-family: "Lucida Console", Monaco, monospace;
+}
+.qitem:hover {
+  background: #0a0a0a;                     /* subtle hover, still black-ish */
+}
+/* Selected / active track */
+.qitem.is-active,
+.qitem.active,
+.qitem.selected {
+  background: var(--blue-bar);              /* #000080 */
+  color: var(--blue-text);                  /* #FFFFFF */
 }
 
+/* clamp title to one line for compact queue */
+.qitem .qi-title {
+  display: block;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Volume slider styling */
 .vol input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -432,248 +365,12 @@ html, body {
   cursor: grabbing;
 }
 
-.vol .volpct {
-  color: var(--muted);
-  text-align: right;
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-}
-
-/* make the right column (queue) use vertical space better and scroll */
-.side-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 18px;
-  /* ensure the queue list can scroll independently */
-}
-
-/* Queue section */
-.queue {
-  max-height: 560px;
-  overflow-y: auto;
-  border: 1px solid var(--bevel-lo);
-  border-radius: 2px;
-  background: var(--playlist-bg);
-}
-
-/* queue list area should take available vertical space and scroll */
-.queue-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding-right: 6px; /* avoid horizontal overlap with action buttons */
-  background: var(--playlist-bg);
-}
-
-/* ensure each qitem is compact and consistent height */
-.qitem {
-  display: grid;
-  grid-template-columns: 40px 1fr var(--q-actions-w);
-  gap: 12px;
-  align-items: center;
-  padding: 10px 8px;
-  min-height: 56px;
-  background: var(--playlist-bg);          /* #000000 */
-  border-bottom: 1px solid var(--bevel-lo);
-  color: var(--green-on);                  /* normal playlist text */
-  font-family: "Lucida Console", Monaco, monospace;
-  cursor: pointer;
-}
-
-.qitem:hover {
-  background: #0a0a0a;                     /* subtle hover, still black-ish */
-}
-
-.qitem:last-child {
-  border-bottom: 0;
-}
-
-.qitem.dragging {
-  opacity: 0.6;
-}
-
-.qitem .idx {
-  color: var(--muted);
-  font-size: 12px;
-  text-align: right;
-}
-
-.qitem .qi-title {
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.qitem .qi-meta {
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.qitem .qi-actions {
-  display: inline-flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-/* Selected / active track */
-.qitem.is-active,
-.qitem.active,
-.qitem.selected,
-.qitem.current {
-  background: var(--blue-bar);              /* #000080 */
-  color: var(--blue-text);                  /* #FFFFFF */
-}
-
-/* clamp title to one line for compact queue */
-.qitem .qi-title {
-  display: block;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Search section */
-.search-box {
-  display: grid;
-  gap: 12px;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 2px;
-  border: 1px solid var(--text-gray);
-  background: var(--base-dark);
-  color: var(--text);
-  outline: none;
-  font-family: "Lucida Console", Monaco, monospace;
-}
-
-.search-box input:focus {
-  border-color: var(--blue-bar);
-}
-
-.search-results {
-  border: 1px solid var(--text-gray);
-  border-radius: 2px;
-  overflow: hidden;
-  max-height: 260px;
-  overflow-y: auto;
-  background: var(--playlist-bg);
-}
-
-.srow {
-  display: grid;
-  grid-template-columns: 40px 1fr 46px;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  background: var(--playlist-bg);
-  border-bottom: 1px solid var(--bevel-lo);
-  color: var(--green-on);
-}
-
-.srow:last-child {
-  border-bottom: 0;
-}
-
-.srow:hover {
-  background: #0a0a0a;
-  cursor: pointer;
-}
-
-.srow img {
-  width: 40px;
-  height: 40px;
-  border-radius: 2px;
-  object-fit: cover;
-  background: #2b3044;
-}
-
-.srow .s-meta {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.srow .s-artist {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* Config section */
-.config {
-  background: var(--base-dark);
-  border-radius: 2px;
-  border: 1px solid var(--bevel-lo);
-  padding: 16px;
-  display: grid;
-  gap: 12px;
-}
-
-.config .row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.config input {
-  padding: 8px 10px;
-  border-radius: 2px;
-  border: 1px solid var(--text-gray);
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--text);
-  width: 100%;
-  font-family: "Lucida Console", Monaco, monospace;
-}
-
-.config input:focus {
-  outline: none;
-  border-color: var(--blue-bar);
-}
-
-.config button {
-  padding: 10px 12px;
-  border-radius: 2px;
-  border: 1px solid var(--btn-border);
-  background: var(--base-dark);
-  color: var(--text);
-  cursor: pointer;
-  font-weight: 700;
-  width: 100%;
-  font-family: "Lucida Console", Monaco, monospace;
-  box-shadow: var(--btn-shadow);
-}
-
-.config button:hover {
-  background: #474747;
-}
-
-.config button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.small {
-  font-size: 11px;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
 /* responsive: reduce button size and action column on narrow screens */
 @media (max-width: 520px) {
   .transport-card .btn { width: 44px; height: 44px; }
   .transport-card .btn.primary { width: 56px; height: 56px; }
   :root { --q-actions-w: 88px; --q-action-btn: 28px; }
   .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; }
-  .config .row { grid-template-columns: 1fr; }
 }
 
 /* responsive fallback (stack vertically on small screens) */
@@ -686,5 +383,4 @@ html, body {
       "queue";
   }
   .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
-  .config .row { grid-template-columns: 1fr; }
 }
