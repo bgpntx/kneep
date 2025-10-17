@@ -11,6 +11,13 @@
   --warn: #f59e0b;
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   --radius: 18px;
+
+  /* New tokens for consistency and theming */
+  --focus-ring: rgba(139,92,246,0.28);
+  --transition-fast: 120ms;
+  --card-border: rgba(255,255,255,0.06);
+  --btn-radius: 12px;
+  --control-gap: 12px;
 }
 
 * {
@@ -182,6 +189,18 @@ body {
   font-size: 18px;
 }
 
+/* Accessibility, focus, motion and small refinements */
+.btn {
+  border-radius: var(--btn-radius);
+  transition: transform var(--transition-fast) ease, background 180ms ease, box-shadow 120ms ease;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 6px rgba(139,92,246,0.10), 0 0 0 2px var(--focus-ring);
+  border-radius: var(--btn-radius);
+}
+
 .btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
@@ -350,66 +369,9 @@ body {
 .qitem.current {
   background: rgba(139, 92, 246, 0.15);
 }
-
-.search-box {
-  display: grid;
-  gap: 12px;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  outline: none;
-}
-
-.search-results {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  overflow: hidden;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.srow {
-  display: grid;
-  grid-template-columns: 40px 1fr 46px;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.srow:last-child {
-  border-bottom: 0;
-}
-
-.srow:hover {
-  background: rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-}
-
-.srow img {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: #2b3044;
-}
-
-.srow .s-meta {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.srow .s-artist {
-  color: var(--muted);
-  font-size: 12px;
+.qitem.current .qi-title,
+.qitem.current .qi-meta {
+  color: #ffffff;
 }
 
 /* Config */
@@ -488,6 +450,15 @@ body {
   font-size: 11px;
 }
 
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* small-screen refinements (tighten gaps, use variables) */
 @media (max-width: 900px) {
   .player-shell {
     grid-template-columns: 1fr;
@@ -499,7 +470,6 @@ body {
   }
 
   .controls {
-    grid-template-columns: repeat(3, 1fr);
     gap: 8px;
   }
 
@@ -526,4 +496,34 @@ body {
   .config input {
     font-size: 16px; /* Prevents zoom on iOS */
   }
+}
+
+/* slider track consistency across engines */
+.seek::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+.seek::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+}
+
+.vol input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+.vol input[type="range"]::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+}
+
+/* visually-hidden helper for screen readers */
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
 }
