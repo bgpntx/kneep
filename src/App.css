@@ -46,638 +46,86 @@ html, body {
   padding: 32px;
 }
 
+/* Winamp-style 3-vertical-fields layout: controls | cover | queue */
 .player-shell {
-  width: 100%;
-  max-width: 1100px;                      /* slightly narrower overall for denser layout */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--shadow);
-  padding: 22px;                          /* reduce padding a touch */
-  display: grid;
-  grid-template-columns: 
-    minmax(var(--left-min), var(--left-max))   /* cover column */
-    var(--center-fr)                            /* transport / player gets most of the room */
-    minmax(var(--right-min), var(--right-max)); /* queue column */
-  gap: var(--inner-gap);                  /* smaller gap between columns */
-}
-
-/* Left: Cover + Track Info */
-.cover-card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: center;
-}
-
-.cover {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 14px;
-  object-fit: cover;
-  background: #292e43;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
-}
-
-.meta {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  text-align: center;
-}
-
-.title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.25px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text);
-}
-
-.artist, .album {
-  color: var(--muted);
-  font-size: 15px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Center: Transport + Progress  */
-.transport-card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 18px 20px;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 20px;
-  align-items: start;
-}
-
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.progress {
-  display: grid;
-  grid-template-columns: 52px 1fr 52px;
-  align-items: center;
+  /* left: controls (narrow) | middle: cover (medium) | right: queue (flex) */
+  grid-template-columns: 200px 360px 1fr;
+  grid-template-areas: "controls cover queue";
   gap: 14px;
-  user-select: none;
+  max-width: 1100px;
+  padding: 18px;
 }
 
-.time {
-  text-align: center;
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  font-size: 14px;
-  min-width: 52px;
+/* assign areas */
+.transport-card { /* previously center transport; now becomes left controls */
+  grid-area: controls;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
 }
 
-.seek {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent) var(--seek-fill, 0%), rgba(255, 255, 255, 0.18) var(--seek-fill, 0%));
-  outline: none;
-  cursor: pointer;
-  transition: background var(--transition);
+/* middle cover area */
+.cover-card {
+  grid-area: cover;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: flex-start;
 }
 
-.seek:hover {
-  background: linear-gradient(90deg, var(--accent-2) var(--seek-fill, 0%), rgba(255, 255, 255, 0.24) var(--seek-fill, 0%));
+/* right queue area */
+.side-card {
+  grid-area: queue;
+  padding: 14px 18px;
+  overflow: hidden;
 }
 
-.seek::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--accent);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
-  cursor: grab;
-  transition: border-color var(--transition);
-}
-
-.seek::-webkit-slider-thumb:hover {
-  border-color: var(--accent-2);
-}
-
-.seek::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--accent);
-  cursor: grab;
-  transition: border-color var(--transition);
-}
-
-.seek::-moz-range-thumb:hover {
-  border-color: var(--accent-2);
-}
-
-.controls {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr)); /* fewer columns => larger controls */
+/* vertical Winamp-like controls (left column) */
+.transport-card .controls {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   align-items: center;
-  justify-items: center;
+  width: 100%;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 48px;
-  width: 48px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  user-select: none;
-  transition: transform 0.12s ease, background 0.3s ease;
-  font-size: 20px;
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-}
-
-.btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  transform: scale(1.05);
-}
-
-.btn:active {
-  transform: translateY(1.5px);
-}
-
-.btn.primary {
-  height: 56px;
+/* make buttons compact and stacked for Winamp feel */
+.transport-card .btn {
   width: 56px;
-  font-size: 24px;
-  background: linear-gradient(180deg, var(--accent), #5b21b6);
-  border: none;
-  color: white;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.3);
-  transition: background 0.3s ease;
-}
-
-.btn.primary.paused {
-  background: linear-gradient(180deg, var(--accent-2), #15803d);
-}
-
-.btn.warn {
-  background: linear-gradient(180deg, var(--warn), #b45309);
-  color: #1a1a1a;
-  border: none;
-}
-
-.btn.danger {
-  background: linear-gradient(180deg, var(--danger), #991b1b);
-}
-
-.btn.active {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.vol {
-  display: grid;
-  gap: 8px;
-  align-content: center;
-  margin-top: 14px;
-}
-
-.vol-row {
-  display: grid;
-  grid-template-columns: 30px 1fr 52px;
-  align-items: center;
-  gap: 12px;
-}
-
-.vol input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent-2) var(--vol-fill, 100%), rgba(255, 255, 255, 0.18) var(--vol-fill, 100%));
-  cursor: pointer;
-  transition: background var(--transition);
-}
-
-.vol input[type="range"]:hover {
-  background: linear-gradient(90deg, #22c55e var(--vol-fill, 100%), rgba(255, 255, 255, 0.25) var(--vol-fill, 100%));
-}
-
-.vol input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid #22c55e;
-  cursor: grab;
-  transition: border-color var(--transition);
-}
-
-.vol input[type="range"]::-webkit-slider-thumb:hover {
-  border-color: #16a34a;
-}
-
-.vol input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid #22c55e;
-  cursor: grab;
-  transition: border-color var(--transition);
-}
-
-.vol input[type="range"]::-moz-range-thumb:hover {
-  border-color: #16a34a;
-}
-
-.vol .volpct {
-  color: var(--muted);
-  text-align: right;
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-size: 14px;
-}
-
-/* Right: Queue + Search */
-.side-card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  display: grid;
-  gap: 20px;
-  position: relative;
-  /* keep extra room on the right so action buttons never draw outside the rounded card */
-  overflow: hidden;
-  /* ensure queue uses Spinnaker (import already at top) */
-  font-family: 'Spinnaker', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-.side-card h3 {
-  margin: 0;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-/* stronger layout guard for qitems to avoid overlap */
-.qitem {
-  display: grid;
-  /* index | title | actions (fixed) — stable column prevents overlap.
-     use the variable above so it's easy to tweak globally */
-  grid-template-columns: 40px 1fr var(--q-actions-w);
-  gap: 12px;
-  align-items: center;
-  padding: 10px 16px;
-  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
-  cursor: grab;
-  transition: background 0.25s ease;
-  position: relative;
-  /* create a stacking context so z-index works predictably per-row */
-  isolation: isolate;
-}
-
-/* ensure title area never flows under actions */
-.qitem .qi-title {
-  min-width: 0; /* critical for truncation inside grid */
-  padding-right: 8px;
-  font-size: 13px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.1;
-}
-
-/* compact "More" menu for queue items (collapse secondary actions) */
-.qitem .qi-actions {
-  /* keep existing inline-flex layout but be a positioning context for the menu */
-  position: relative;
-  display: inline-flex;
-  gap: var(--q-action-gap);
-  align-items: center;
-  justify-content: flex-end;
-  justify-self: end;
-  padding-left: 6px;
-  pointer-events: auto;
-  z-index: 10;
-}
-
-/* visible quick action(s) */
-.qitem .qi-actions .btn {
-  width: var(--q-action-btn);
-  height: var(--q-action-btn);
-  font-size: 12px;
-  border-radius: 8px;
-  padding: 0;
-  box-shadow: none;
-  border-width: 1px;
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 var(--q-action-btn);
-}
-
-/* "more" toggle button */
-.qitem .qi-actions .btn.more {
-  width: var(--q-action-btn);
-  height: var(--q-action-btn);
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255,255,255,0.03);
-  font-weight: 700;
-}
-
-/* hidden menu (popout) for secondary actions */
-.qitem .qi-actions .more-menu {
-  position: absolute;
-  right: calc(100% + 8px); /* open to the left of the actions area */
-  top: 50%;
-  transform: translateY(-50%);
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  height: 56px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.45);
-  min-width: 40px;
-  white-space: nowrap;
-  z-index: 40; /* render above list rows */
+  font-size: 18px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
 }
 
-/* show menu when toggled open */
-.qitem .qi-actions.open .more-menu {
-  display: flex;
-}
-
-/* hide secondary actions inline; they appear in the more-menu when open */
-.qitem .qi-actions .btn[data-role="secondary"] {
-  display: none;
-}
-
-/* when menu is open, show secondary buttons inside it */
-.qitem .qi-actions.open .more-menu .btn[data-role="secondary"] {
-  display: inline-flex;
-  width: 44px;
-  height: 36px;
-  font-size: 14px;
-  border-radius: 8px;
-}
-
-/* on very wide screens show secondaries inline and hide the more button */
-@media (min-width: 1400px) {
-  .qitem .qi-actions .btn[data-role="secondary"] {
-    display: inline-flex;
-  }
-  .qitem .qi-actions .btn.more {
-    display: none;
-  }
-}
-
-/* accessibility: ensure menu and toggle are keyboard friendly */
-.qitem .qi-actions .btn.more:focus {
-  outline: 3px solid rgba(124,58,237,0.18);
-  outline-offset: 3px;
-}
-
-/* Search */
-.search-box {
-  display: grid;
-  gap: 14px;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-  outline: none;
-  font-size: 16px;
-  font-weight: 500;
-  transition: border-color 0.3s ease, background 0.3s ease;
-}
-
-.search-box input:focus {
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.search-box input::placeholder {
-  color: var(--muted);
-  opacity: 0.75;
-}
-
-/* Search Results */
-.search-results {
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  overflow: hidden;
-  max-height: 280px;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
-
-.srow {
-  display: grid;
-  grid-template-columns: 44px 1fr 48px;
-  gap: 14px;
-  align-items: center;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
-  transition: background 0.25s ease;
-  cursor: pointer;
-}
-
-.srow:last-child {
-  border-bottom: 0;
-}
-
-.srow:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.srow img {
-  width: 44px;
-  height: 44px;
+/* primary (play/pause) slightly larger */
+.transport-card .btn.primary {
+  width: 72px;
+  height: 72px;
+  font-size: 20px;
   border-radius: 12px;
-  object-fit: cover;
-  background: #343a5a;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.srow .s-meta {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 600;
-  color: var(--text);
-}
+/* tighten spacing for the whole UI */
+.cover-card .meta { gap: 6px; }
+.side-card { gap: 12px; }
 
-.srow .s-artist {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Config */
-.config {
-  margin-top: 24px;
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 24px;
-  display: grid;
-  gap: 20px;
-}
-
-.config .row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  align-items: stretch;
-}
-
-.config input {
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-  width: 100%;
-  font-size: 16px;
-  font-weight: 500;
-  transition: border-color 0.3s ease, background 0.3s ease;
-  outline-offset: 2px;
-}
-
-.config input:focus {
-  outline: none;
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.config input::placeholder {
-  color: var(--muted);
-  opacity: 0.8;
-}
-
-.config button {
-  padding: 14px 24px;
-  border-radius: 14px;
-  border: 1.5px solid rgba(34, 197, 94, 0.4);
-  background: linear-gradient(180deg, var(--accent-2), #15803d);
-  color: white;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 16px;
-  margin-top: 6px;
-  transition: transform 0.12s ease, box-shadow 0.3s ease;
-  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
-}
-
-.config button:hover {
-  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.45);
-}
-
-.config button:active {
-  transform: translateY(2px);
-}
-
-/* Small text */
-.small {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.5;
-  padding: 0 3px;
-}
-
-.small code {
-  background: rgba(255, 255, 255, 0.12);
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-/* Responsive */
+/* responsive fallback (stack vertically on small screens) */
 @media (max-width: 900px) {
   .player-shell {
     grid-template-columns: 1fr;
-    gap: 20px;
+    grid-template-areas:
+      "cover"
+      "controls"
+      "queue";
   }
-
-  .cover-card, .transport-card, .side-card {
-    width: 100%;
-  }
-
-  .controls {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .btn {
-    width: 100%;
-    height: 44px;
-    font-size: 18px;
-    border-radius: 12px;
-  }
-
-  .btn.primary {
-    height: 52px;
-    font-size: 22px;
-  }
-
-  .config {
-    padding: 22px;
-  }
-
-  .config .row {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-
-  .config input {
-    font-size: 18px; /* Prevents zoom on iOS */
-  }
+  .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 }
+
+/* ...existing code... */
 

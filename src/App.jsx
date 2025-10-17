@@ -545,15 +545,32 @@ export default function App() {
                 </div>
             </aside>
 
-            <main className="transport-card">
-                <div className="status-row">
-                    <div>{statusText}</div>
-                    <div className="small">
-                        Queue: {state.playlist.length} tracks
-                        {hasMediaSession && <span> • 🎵 Media Controls</span>}
-                    </div>
+            <div className="transport-card">
+                <div className="controls">
+                    <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>
+                        ⏮
+                    </button>
+
+                    {/* Primary play / pause (no separate stop button) */}
+                    <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
+                        {state.playing ? '⏸' : '▶'}
+                    </button>
+
+                    <button className="btn" title="Next" onClick={() => handleTransport('next')}>
+                        ⏭
+                    </button>
+
+                    <button className="btn" title="Shuffle" onClick={() => handleTransport('shuffle')}>
+                        🔀
+                    </button>
+
+                    <button className="btn" title="Repeat" onClick={() => handleTransport('repeat')}>
+                        🔁
+                    </button>
+
+                    {/* add other compact controls as needed, but omit Stop (Pause covers it) */}
                 </div>
-                
+
                 <div className="progress">
                     <div className="time">{fmtTime(state.position)}</div>
                     <input 
@@ -569,68 +586,7 @@ export default function App() {
                     />
                     <div className="time">{fmtTime(currentTrack?.duration || 0)}</div>
                 </div>
-                
-                <div>
-                    <div className="controls">
-                        <button 
-                            className="btn" 
-                            onClick={() => handleTransport('shuffle')}
-                            disabled={!isAuthenticated || commandInProgress.current}>🔀</button>
-                        <button 
-                            className="btn" 
-                            onClick={() => handleTransport('previous')}
-                            disabled={!isAuthenticated || commandInProgress.current}>⏮️</button>
-                        <button 
-                            className={`btn primary ${state.playing ? 'paused' : ''}`}
-                            onClick={() => handleTransport('play-pause')}
-                            disabled={!isAuthenticated || commandInProgress.current}>
-                            {state.playing ? '⏸️' : '▶️'}
-                        </button>
-                        <button 
-                            className="btn" 
-                            onClick={() => handleTransport('next')}
-                            disabled={!isAuthenticated || commandInProgress.current}>⏭️</button>
-                        <button 
-                            className={`btn ${state.repeatMode !== 'off' ? 'active' : ''}`}
-                            onClick={() => setState(s => ({ 
-                                ...s, 
-                                repeatMode: s.repeatMode === 'off' ? 'all' : s.repeatMode === 'all' ? 'one' : 'off'
-                            }))}
-                            disabled={!isAuthenticated}>
-                            {state.repeatMode === 'one' ? '🔂1' : state.repeatMode === 'all' ? '🔂' : '🔁'}
-                        </button>
-                        <button 
-                            className="btn warn" 
-                            onClick={() => handleTransport('stop')}
-                            disabled={!isAuthenticated || commandInProgress.current}>⏹️</button>
-                        <button 
-                            className="btn danger" 
-                            onClick={() => handleTransport('clear')}
-                            disabled={!isAuthenticated || commandInProgress.current}>🗑️</button>
-                        <button 
-                            className="btn" 
-                            onClick={() => handleTransport('addRandom')}
-                            disabled={!isAuthenticated || commandInProgress.current}>🎲</button>
-                    </div>
-                    
-                    <div className="vol">
-                        <div className="vol-row">
-                            <div>🔊</div>
-                            <input 
-                                type="range" 
-                                min="0" 
-                                max="100" 
-                                value={Math.round(state.gain * 100)}
-                                style={volFillStyle}
-                                onChange={handleVolumeChange}
-                                onInput={handleVolumeChange}
-                                disabled={!isAuthenticated}
-                            />
-                            <div className="volpct">{Math.round(state.gain * 100)}%</div>
-                        </div>
-                    </div>
-                </div>
-            </main>
+            </div>
 
             <aside className="side-card">
                 <h3>Queue</h3>
