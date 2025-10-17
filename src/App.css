@@ -312,7 +312,8 @@ body {
 
 .qitem {
   display: grid;
-  grid-template-columns: 28px 1fr 60px;
+  /* reserve a stable actions area and give the title a flexible middle column */
+  grid-template-columns: 28px 1fr minmax(88px, auto);
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -353,17 +354,26 @@ body {
   display: inline-flex;
   gap: 8px;
   justify-content: flex-end;
+  justify-self: end; /* ensure actions stay in their column and aligned right */
 }
 
-.qitem .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  font-size: 11px;
-  background: rgba(139, 92, 246, 0.16);
-  color: #c4b5fd;
+/* Smaller action buttons inside the queue to avoid overlap */
+.qitem .qi-actions .btn {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  border-radius: 8px;
+  padding: 0;
+  min-width: 32px;
+}
+
+/* ensure titles keep clear space and don't underflow under actions */
+.qitem .qi-title,
+.qitem .qi-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 8px; /* small buffer so text doesn't touch action area */
 }
 
 .qitem.current {
