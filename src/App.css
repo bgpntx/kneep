@@ -23,7 +23,8 @@
 html, body {
   height: 100%;
   margin: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  /* use Spinnaker app-wide, fall back to system fonts */
+  font-family: 'Spinnaker', "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text);
   background: radial-gradient(1300px 700px at 15% -15%, #2a1e6a 0%, transparent 55%),
               radial-gradient(1100px 900px at 115% 25%, #0d4773 0%, transparent 55%),
@@ -316,7 +317,8 @@ html, body {
   display: grid;
   gap: 20px;
   position: relative;
-  overflow: hidden; /* prevent action buttons from drawing outside the card */
+  /* allow action buttons to draw above the list (prevents accidental clipping) */
+  overflow: visible;
   /* ensure queue uses Spinnaker (import already at top) */
   font-family: 'Spinnaker', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -344,18 +346,23 @@ html, body {
   position: relative;
 }
 
-/* title must be able to shrink and keep a buffer for the action buttons */
+/* title: allow wrapping (up to 2 lines) so long names format correctly;
+   meta stays single-line and muted */
 .qitem .qi-title {
    min-width: 0;
    padding-right: 8px;
    font-size: 13px;
-   white-space: nowrap;
+   /* allow up to two lines with ellipsis */
+   display: -webkit-box;
+   -webkit-line-clamp: 2;
+   -webkit-box-orient: vertical;
+   white-space: normal;
    overflow: hidden;
    text-overflow: ellipsis;
-   font-weight: 600;
-   color: var(--text);
-   line-height: 1.1;
- }
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.1;
+  }
 
 .qitem .qi-meta {
    padding-right: 8px;
@@ -366,9 +373,8 @@ html, body {
    text-overflow: ellipsis;
  }
 
-/* absolutely position actions to the right of each qitem so they never push into the title */
+/* keep actions inside the third column and right aligned */
 .qitem .qi-actions {
-  /* keep actions inside the third column and right aligned */
   display: inline-flex;
   gap: 8px;
   align-items: center;
@@ -376,6 +382,8 @@ html, body {
   justify-self: end;
   padding-left: 6px;
   pointer-events: auto;
+  z-index: 20;      /* ensure actions render above list rows */
+  visibility: visible;
 }
 
 /* compact action buttons inside queue to avoid overlap */
@@ -387,6 +395,11 @@ html, body {
   padding: 0;
   box-shadow: none;
   border-width: 1px;
+  background: rgba(255,255,255,0.04); /* ensure buttons are visible on dark bg */
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* keep small viewports working */
