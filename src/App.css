@@ -324,83 +324,77 @@ html, body {
   font-weight: 600;
 }
 
+/* Load Spinnaker from Google Fonts so the .queue rule can use it */
+@import url('https://fonts.googleapis.com/css2?family=Spinnaker&display=swap');
+
 .queue {
   /* use Spinnaker for the queue — fallbacks provided */
   font-family: 'Spinnaker', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px; /* base for the queue area (easier to tweak) */
 }
 
+/* stronger layout guard for qitems to avoid overlap */
 .qitem {
   display: grid;
-  /* reserve a stable actions area so buttons never slide over titles */
-  grid-template-columns: 36px 1fr minmax(96px, 140px);
+  /* widen/reserve actions area more and make it stable */
+  grid-template-columns: 40px 1fr minmax(120px, 220px);
   gap: 12px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 10px 16px; /* more right padding to keep gap from edge */
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
   cursor: grab;
   transition: background 0.25s ease;
 }
 
-.qitem:last-child {
-  border-bottom: 0;
-}
-
-.qitem.dragging {
-  opacity: 0.5;
-}
-
-.qitem .idx {
-  color: var(--muted);
-  font-size: 11px; /* smaller index */
-  text-align: right;
-  font-weight: 600;
-}
-
+/* ensure title can shrink and never flows under the action column */
 .qitem .qi-title {
-  font-size: 13px; /* reduced title size */
+  min-width: 0;           /* allow grid to shrink this cell */
+  padding-right: 16px;    /* safe buffer from action buttons */
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0; /* allow flex/grid to shrink title properly */
   font-weight: 600;
   color: var(--text);
   line-height: 1.1;
 }
 
 .qitem .qi-meta {
+  padding-right: 16px;    /* same buffer for meta line */
   color: var(--muted);
-  font-size: 11px; /* reduced meta size */
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 500;
-  line-height: 1.1;
 }
 
+/* make action area compact and buttons smaller so they never overlap */
 .qitem .qi-actions {
   display: inline-flex;
   gap: 8px;
   justify-content: flex-end;
-  justify-self: end;    /* keep actions inside their column */
-  min-width: 96px;     /* match the reserved column */
+  justify-self: end;
+  min-width: 120px; /* match min of column */
 }
 
-/* compact action buttons inside queue to prevent overlap */
+/* compact action buttons inside queue */
 .qitem .qi-actions .btn {
-  width: 36px;
-  height: 36px;
-  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
   border-radius: 10px;
   padding: 0;
   box-shadow: none;
   border-width: 1px;
 }
 
-/* give titles a little right buffer so text never touches the action area */
-.qitem .qi-title,
-.qitem .qi-meta {
-  padding-right: 12px;
+/* fallback: if viewport is very narrow, force actions to a single column stacked */
+@media (max-width: 420px) {
+  .qitem {
+    grid-template-columns: 28px 1fr 96px;
+    padding-right: 12px;
+  }
+  .qitem .qi-actions .btn { width: 28px; height: 28px; font-size: 12px; }
 }
 
 /* Search */
