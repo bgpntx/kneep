@@ -2,18 +2,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Spinnaker&display=swap');
 
 :root {
-  --bg1: #1b1b1b;
-  --bg2: #111111;
-  --card: #2c2c2c;
-  --muted: #a0b0a0;
-  --text: #00ffcc;           /* Winamp greenish text */
-  --accent: #00baff;         /* Teal/blue highlight */
-  --accent-2: #ffcc00;       /* Amber highlight */
+  /* Core Winamp colors */
+  --base-dark: #404040;   /* main housing */
+  --bevel-hi:  #959595;   /* highlight */
+  --bevel-lo:  #292929;   /* shadow */
+  --text-gray: #B5B5B5;   /* labels/borders */
+  --blue-bar:  #000080;   /* title bar + selection */
+  --blue-text: #FFFFFF;   /* title bar text */
+  --green-on:  #00FF00;   /* active elements */
+  --playlist-bg: #000000; /* playlist background */
+
+  /* Map to existing tokens the rest of the CSS uses */
+  --bg1: var(--base-dark);
+  --bg2: var(--bevel-lo);
+  --card: var(--base-dark);
+  --muted: var(--text-gray);
+  --text: var(--text-gray);
+  --accent: var(--blue-bar);
+  --accent-2: var(--green-on);
   --danger: #ff0033;
   --warn: #ffaa00;
-  --shadow: 0 0 10px rgba(0,0,0,0.8);
-  --radius: 4px;
-  --transition: 0.2s ease;
+  --shadow: 0 0 8px rgba(0,0,0,0.7);
+  --radius: 2px;
+  --transition: 0.15s ease;
 
   /* Queue action sizing tokens */
   --q-actions-w: 120px;
@@ -28,11 +39,11 @@
   --inner-gap: 20px;
 
   /* Button design tokens */
-  --btn-bg: #333333;
-  --btn-border: #555555;
-  --btn-shadow: inset 0 1px 0 #666666, 0 0 6px rgba(0,255,204,0.2);
-  --btn-ring: rgba(0,186,255,0.35);
-  --btn-radius: 3px;
+  --btn-bg: var(--base-dark);
+  --btn-border: var(--bevel-hi);
+  --btn-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
+  --btn-ring: rgba(0,0,128,0.35);
+  --btn-radius: 2px;
 
   --btn-size: 50px;
   --btn-primary-size: 64px;
@@ -46,12 +57,12 @@
   width: var(--btn-size);
   height: var(--btn-size);
   border-radius: var(--btn-radius);
-  background: linear-gradient(180deg, #333333, #111111);
+  background: var(--base-dark);
   border: 1px solid var(--btn-border);
-  color: var(--text);
+  color: var(--text-gray);
   box-shadow: var(--btn-shadow);
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, opacity 120ms ease;
+  transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -60,10 +71,10 @@
 .btn.primary {
   width: var(--btn-primary-size);
   height: var(--btn-primary-size);
-  background: linear-gradient(180deg, var(--accent), #0077aa);
-  border: 1px solid #00ccff;
-  color: #001a19;
-  box-shadow: 0 0 10px rgba(0,186,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.35);
+  background: var(--base-dark);
+  border: 1px solid var(--btn-border);
+  color: var(--text-gray);
+  box-shadow: var(--btn-shadow);
 }
 
 /* Dice / special action */
@@ -98,17 +109,16 @@
 /* hover / active / focus */
 .btn:hover {
   transform: translateY(-1px);
-  background: linear-gradient(180deg, #444444, #222222);
-  box-shadow: 0 0 6px rgba(0,255,204,0.6);
+  background: #474747;
 }
 .btn:active {
   transform: translateY(0) scale(0.98);
-  background: linear-gradient(180deg, #2d2d2d, #0f0f0f);
-  box-shadow: 0 0 4px rgba(0,0,0,0.8) inset;
+  background: #3a3a3a;
+  box-shadow: inset 0 1px 0 var(--bevel-lo);
 }
 .btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--btn-ring), 0 0 10px rgba(0,186,255,0.5);
+  box-shadow: 0 0 0 2px var(--blue-bar);
 }
 
 /* disabled state */
@@ -151,9 +161,7 @@ html, body {
   margin: 0;
   font-family: "Lucida Console", Monaco, monospace;
   color: var(--text);
-  background:
-    repeating-linear-gradient(0deg, #202020, #202020 1px, #1a1a1a 2px),
-    linear-gradient(180deg, var(--bg1), var(--bg2));
+  background: var(--base-dark);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -166,10 +174,10 @@ html, body {
   gap: 14px;
   max-width: 1100px;
   padding: 16px;
-  background: repeating-linear-gradient(0deg, #222222, #222222 1px, #1d1d1d 2px);
-  border: 2px solid #333333;
-  box-shadow: 0 0 15px rgba(0,0,0,0.8);
-  border-radius: 3px;
+  background: var(--base-dark);
+  border: 1px solid var(--text-gray);
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo);
+  border-radius: 2px;
 }
 
 /* assign areas */
@@ -181,10 +189,10 @@ html, body {
   gap: 12px;
   align-items: center;
   justify-content: flex-start;
-  background: linear-gradient(180deg, #2a2a2a, #181818);
-  border: 1px solid #4d4d4d;
-  box-shadow: inset 0 1px 0 #666, inset 0 -1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
-  border-radius: 3px;
+  background: var(--base-dark);
+  border: 1px solid var(--text-gray);
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
+  border-radius: 2px;
 }
 
 /* middle cover area */
@@ -196,10 +204,10 @@ html, body {
   gap: 14px;
   align-items: center;
   justify-content: flex-start;
-  background: linear-gradient(180deg, #2a2a2a, #181818);
-  border: 1px solid #4d4d4d;
-  box-shadow: inset 0 1px 0 #666, inset 0 -1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
-  border-radius: 3px;
+  background: var(--base-dark);
+  border: 1px solid var(--text-gray);
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
+  border-radius: 2px;
 }
 
 /* right queue area */
@@ -210,10 +218,10 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(180deg, #2a2a2a, #181818);
-  border: 1px solid #4d4d4d;
-  box-shadow: inset 0 1px 0 #666, inset 0 -1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
-  border-radius: 3px;
+  background: var(--base-dark);
+  border: 1px solid var(--text-gray);
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
+  border-radius: 2px;
 }
 
 /* transport controls: horizontal Winamp-like bar */
@@ -266,6 +274,7 @@ html, body {
   flex: 1 1 auto;
   overflow-y: auto;
   padding-right: 6px; /* avoid horizontal overlap with action buttons */
+  background: var(--playlist-bg);
 }
 
 /* ensure each qitem is compact and consistent height */
@@ -276,14 +285,20 @@ html, body {
   align-items: center;
   padding: 10px 8px;
   min-height: 56px;
-  background: #111111;
-  border-bottom: 1px solid #333333;
-  color: #00ffcc;
+  background: var(--playlist-bg);          /* #000000 */
+  border-bottom: 1px solid var(--bevel-lo);
+  color: var(--green-on);                  /* normal playlist text */
   font-family: "Lucida Console", Monaco, monospace;
 }
 .qitem:hover {
-  background: #1f1f1f;
-  color: #ffcc00;
+  background: #0a0a0a;                     /* subtle hover, still black-ish */
+}
+/* Selected / active track */
+.qitem.is-active,
+.qitem.active,
+.qitem.selected {
+  background: var(--blue-bar);              /* #000080 */
+  color: var(--blue-text);                  /* #FFFFFF */
 }
 
 /* clamp title to one line for compact queue */
