@@ -1,17 +1,16 @@
-// src/jukeboxApi.js - Secure Version (No Password Storage)
+// src/jukeboxApi.js - Simplified Authentication (Username/Password Only)
 
 const API_VERSION = '1.16.1';
 
-// Set to true in browser console to enable debug logging: window.JUKEBOX_DEBUG = true
+// Debug logging
 const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
 
-// Global configuration state, initialized from localStorage
+// Global configuration state
 let config = JSON.parse(localStorage.getItem('jukeboxConfig')) || {
     serverUrl: 'http://localhost:4533',
     username: '',
     token: '',
     salt: ''
-    // NOTE: password is NEVER stored in config or localStorage
 };
 
 // --- MD5 Hash Function (for Subsonic authentication) ---
@@ -156,90 +155,38 @@ function generateSalt() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-// Generate token and salt from password
-function generateAuth(password) {
-    const salt = generateSalt();
-    const token = md5(password + salt);
-    return { token, salt };
+// Generate token from password + salt
+function generateToken(password, salt) {
+    return md5(password + salt);
 }
 
 // --- Session Management ---
 
-/**
- * Check if the current token has expired
- * @returns {boolean} true if expired or no expiry set
- */
-export function isTokenExpired() {
-    const expiry = localStorage.getItem('tokenExpiry');
-    if (!expiry) return true;
-    return Date.now() > parseInt(expiry, 10);
+export function isSessionValid() {
+    return !!(config.token && config.salt && config.username);
 }
 
-/**
- * Get time until token expires in milliseconds
- * @returns {number} milliseconds until expiry, 0 if expired
- */
-export function getTimeUntilExpiry() {
-    const expiry = localStorage.getItem('tokenExpiry');
-    if (!expiry) return 0;
-    const remaining = parseInt(expiry, 10) - Date.now();
-    return Math.max(0, remaining);
-}
-
-/**
- * Clear the current session (token, salt, expiry)
- * Preserves serverUrl for convenience
- */
 export function clearSession() {
-    const serverUrl = config.serverUrl; // Preserve server URL
-    
+    const serverUrl = config.serverUrl;
     localStorage.removeItem('jukeboxConfig');
-    localStorage.removeItem('tokenExpiry');
-    
     config = {
         serverUrl: serverUrl,
         username: '',
         token: '',
         salt: ''
     };
-    
     if (DEBUG()) console.log('Session cleared');
-}
-
-/**
- * Check authentication and throw error if missing or expired
- * @throws {Error} 'SESSION_EXPIRED' if token expired or missing
- */
-function ensureAuth() {
-    // Check token expiration first
-    if (isTokenExpired()) {
-        if (DEBUG()) console.log('Token expired');
-        clearSession();
-        throw new Error('SESSION_EXPIRED');
-    }
-    
-    // Check if we have token and salt
-    if (!config.token || !config.salt) {
-        throw new Error('SESSION_EXPIRED');
-    }
 }
 
 // --- Utilities ---
 
-export function decodeHtml(html) {
-    const txt = document.createElement('textarea');
-    txt.innerHTML = html;
-    return txt.value;
-}
-
-// Keep escapeHtml for backward compatibility but not needed in React
 export function escapeHtml(s) {
     return String(s);
 }
 
 function buildJukeboxUrl(action, extra = '') {
     if (!config.token || !config.salt) {
-        throw new Error('SESSION_EXPIRED');
+        throw new Error('Not authenticated');
     }
     const base = `${config.serverUrl}/rest/jukeboxControl?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
     return `${base}&action=${action}${extra}`;
@@ -250,34 +197,21 @@ export function coverArtUrl(id, size = 512) {
     return `${config.serverUrl}/rest/getCoverArt?id=${encodeURIComponent(id)}&size=${size}&u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox`;
 }
 
-// --- Jukebox API Call ---
+// --- Main API Call ---
 
-/**
- * Call the Navidrome Jukebox API
- * @param {string} action - Jukebox action (get, start, stop, skip, etc)
- * @param {string} extra - Additional URL parameters
- * @returns {Promise<{status: Object, playlist: Object}>}
- * @throws {Error} 'SESSION_EXPIRED' if auth fails or token expired
- */
 export async function callJukebox(action, extra = '') {
-    // Check token expiration before making request
-    if (isTokenExpired()) {
-        if (DEBUG()) console.log('Token expired before API call');
-        clearSession();
-        throw new Error('SESSION_EXPIRED');
+    if (!isSessionValid()) {
+        throw new Error('Not authenticated');
     }
     
-    ensureAuth();
     const url = buildJukeboxUrl(action, extra);
     
     try {
         const res = await fetch(url);
         
-        // Handle authentication errors
         if (res.status === 401 || res.status === 403) {
-            if (DEBUG()) console.log('Auth error from server:', res.status);
             clearSession();
-            throw new Error('SESSION_EXPIRED');
+            throw new Error('Authentication failed');
         }
         
         if (!res.ok) {
@@ -290,24 +224,14 @@ export async function callJukebox(action, extra = '') {
         
         const resp = data?.['subsonic-response'];
         if (resp?.status !== 'ok') {
-            // Check for Subsonic auth error codes
-            if (resp?.error?.code === 40 || resp?.error?.code === 41) {
-                if (DEBUG()) console.log('Subsonic auth error:', resp.error);
-                clearSession();
-                throw new Error('SESSION_EXPIRED');
-            }
-            
             const errorMsg = resp?.error?.message || 'Unknown API error';
             throw new Error(`API failed: ${errorMsg}`);
         }
         
-        // Navidrome API is inconsistent:
-        // - 'get' returns status fields in jukeboxPlaylist
-        // - 'add'/'skip'/etc return status in jukeboxStatus
+        // Parse response
         const playlistObj = resp.jukeboxPlaylist || {};
         const statusObj = resp.jukeboxStatus || playlistObj;
         
-        // Extract status fields from the correct object
         const status = {
             currentIndex: statusObj.currentIndex ?? 0,
             playing: statusObj.playing ?? false,
@@ -315,192 +239,151 @@ export async function callJukebox(action, extra = '') {
             position: statusObj.position ?? 0,
         };
         
-        // Extract playlist entries (only in jukeboxPlaylist)
         const playlist = {
             entry: playlistObj.entry || []
         };
         
-        if (DEBUG()) {
-            console.log('Parsed status:', status);
-            console.log('Parsed playlist:', playlist.entry?.length || 0, 'tracks');
-        }
-        
-        // Return structured data for React component to process
         return { status, playlist };
         
     } catch (error) {
-        // Re-throw SESSION_EXPIRED errors for component to handle
-        if (error.message === 'SESSION_EXPIRED') {
+        if (error.message === 'Authentication failed') {
             throw error;
         }
-        
-        // Network errors might indicate auth issues
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            console.error('Network error - possibly CORS or server down:', error);
-        }
-        
         throw error;
     }
 }
 
-// --- Random Song & Search ---
+// --- Search & Random Songs ---
 
 async function getRandomSongFromServer() {
-    if (isTokenExpired()) {
-        clearSession();
-        throw new Error('SESSION_EXPIRED');
+    if (!isSessionValid()) {
+        throw new Error('Not authenticated');
     }
     
-    ensureAuth();
     const url = `${config.serverUrl}/rest/getRandomSongs?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&size=1`;
     
-    try {
-        const res = await fetch(url);
-        
-        if (res.status === 401 || res.status === 403) {
-            clearSession();
-            throw new Error('SESSION_EXPIRED');
-        }
-        
-        const data = await res.json();
-        const resp = data?.['subsonic-response'];
-        
-        if (resp?.status !== 'ok') {
-            if (resp?.error?.code === 40 || resp?.error?.code === 41) {
-                clearSession();
-                throw new Error('SESSION_EXPIRED');
-            }
-            throw new Error(`API failed: ${resp?.error?.message || 'Unknown API error'}`);
-        }
-        
-        const song = Array.isArray(resp.randomSongs?.song) 
-            ? resp.randomSongs.song[0] 
-            : resp.randomSongs?.song;
-            
-        if (!song || !song.id) {
-            throw new Error('Server returned no songs.');
-        }
-        
-        return song;
-    } catch (error) {
-        if (error.message === 'SESSION_EXPIRED') {
-            throw error;
-        }
-        throw error;
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) {
+        clearSession();
+        throw new Error('Authentication failed');
     }
+    
+    const data = await res.json();
+    const resp = data?.['subsonic-response'];
+    
+    if (resp?.status !== 'ok') {
+        throw new Error(`API failed: ${resp?.error?.message || 'Unknown error'}`);
+    }
+    
+    const song = Array.isArray(resp.randomSongs?.song) 
+        ? resp.randomSongs.song[0] 
+        : resp.randomSongs?.song;
+        
+    if (!song || !song.id) {
+        throw new Error('Server returned no songs.');
+    }
+    
+    return song;
 }
 
 export async function addRandomSong() {
     const randomSong = await getRandomSongFromServer();
     const resp = await callJukebox('add', `&id=${encodeURIComponent(randomSong.id)}`);
-    
     return { randomSong, resp };
 }
 
 export async function searchSongs(query) {
     if (query.length < 2) return [];
+    if (!isSessionValid()) throw new Error('Not authenticated');
     
-    if (isTokenExpired()) {
-        clearSession();
-        throw new Error('SESSION_EXPIRED');
-    }
-    
-    ensureAuth();
     const url = `${config.serverUrl}/rest/search3?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&query=${encodeURIComponent(query)}`;
     
-    try {
-        const res = await fetch(url);
-        
-        if (res.status === 401 || res.status === 403) {
-            clearSession();
-            throw new Error('SESSION_EXPIRED');
-        }
-        
-        const data = await res.json();
-        return data?.['subsonic-response']?.searchResult3?.song || [];
-    } catch (error) {
-        if (error.message === 'SESSION_EXPIRED') {
-            throw error;
-        }
-        throw error;
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) {
+        clearSession();
+        throw new Error('Authentication failed');
     }
+    
+    const data = await res.json();
+    return data?.['subsonic-response']?.searchResult3?.song || [];
 }
 
-// --- Config Management ---
+// --- Config Management (SIMPLIFIED) ---
 
-/**
- * Get current configuration (does NOT include password)
- * @returns {Object} config object
- */
 export function getConfig() {
+    return {
+        serverUrl: config.serverUrl,
+        username: config.username
+    };
+}
+
+/**
+ * Authenticate with username and password
+ * Generates new token/salt each time
+ * @param {string} serverUrl 
+ * @param {string} username 
+ * @param {string} password 
+ * @returns {Promise<Object>} config with token/salt
+ */
+export async function authenticate(serverUrl, username, password) {
+    if (!serverUrl || !username || !password) {
+        throw new Error('Server URL, username, and password are required');
+    }
+    
+    // Generate new salt and token
+    const salt = generateSalt();
+    const token = generateToken(password, salt);
+    
+    // Test authentication with ping
+    const testUrl = `${serverUrl}/rest/ping?u=${encodeURIComponent(username)}&t=${token}&s=${salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
+    
+    const res = await fetch(testUrl);
+    if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const resp = data?.['subsonic-response'];
+    
+    if (resp?.status !== 'ok') {
+        const errorMsg = resp?.error?.message || 'Authentication failed';
+        throw new Error(errorMsg);
+    }
+    
+    // Save config (no password stored!)
+    config = {
+        serverUrl,
+        username,
+        token,
+        salt
+    };
+    
+    localStorage.setItem('jukeboxConfig', JSON.stringify(config));
+    
+    if (DEBUG()) {
+        console.log('Authentication successful');
+        console.log('Token:', token);
+        console.log('Salt:', salt);
+    }
+    
     return config;
 }
 
 /**
- * Save configuration with security improvements
- * @param {Object} newConfig - New configuration values
- * @returns {Object} saved configuration
- * 
- * SECURITY NOTE: Password is NEVER stored in localStorage
- * Password is only used temporarily to generate token/salt, then discarded
+ * Check if we have saved credentials and try to reconnect
+ * @returns {Promise<boolean>} true if reconnected successfully
  */
-export function saveConfig(newConfig) {
-    config = { ...config, ...newConfig };
-    
-    // Priority: Use manual token/salt if both are provided
-    // Otherwise, generate from password if provided
-    if (newConfig.token && newConfig.salt) {
-        // Manual token/salt provided - use them
-        config.token = newConfig.token;
-        config.salt = newConfig.salt;
-        
-        // Set expiration (47 hours to be safe, Navidrome default is 48h)
-        const expiryTime = Date.now() + (47 * 60 * 60 * 1000);
-        localStorage.setItem('tokenExpiry', expiryTime.toString());
-        
-        if (DEBUG()) console.log('Token/salt manually set, expires:', new Date(expiryTime));
-        
-    } else if (newConfig.password && newConfig.password !== '') {
-        // Password provided - generate token/salt
-        const auth = generateAuth(newConfig.password);
-        config.token = auth.token;
-        config.salt = auth.salt;
-        
-        // Set expiration (47 hours to be safe, Navidrome default is 48h)
-        const expiryTime = Date.now() + (47 * 60 * 60 * 1000);
-        localStorage.setItem('tokenExpiry', expiryTime.toString());
-        
-        if (DEBUG()) {
-            console.log('Generated new token/salt from password');
-            console.log('Token expires:', new Date(expiryTime));
-        }
+export async function reconnect() {
+    if (!isSessionValid()) {
+        return false;
     }
     
-    // CRITICAL SECURITY: Remove password from config before saving
-    const safeConfig = { ...config };
-    delete safeConfig.password;
-    
-    // Save to localStorage WITHOUT password
-    localStorage.setItem('jukeboxConfig', JSON.stringify(safeConfig));
-    
-    if (DEBUG()) console.log('Config saved (password NOT included):', safeConfig);
-    
-    return config;
-}
-
-/**
- * Get a human-readable time until session expires
- * @returns {string} e.g., "2 hours 15 minutes"
- */
-export function getExpiryDisplay() {
-    const remaining = getTimeUntilExpiry();
-    if (remaining === 0) return 'Expired';
-    
-    const hours = Math.floor(remaining / (1000 * 60 * 60));
-    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
+    try {
+        // Test connection with a simple status call
+        await callJukebox('get');
+        return true;
+    } catch (error) {
+        clearSession();
+        return false;
     }
-    return `${minutes}m`;
 }

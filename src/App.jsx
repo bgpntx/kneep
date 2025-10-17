@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - Simplified Authentication
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
     callJukebox, 
@@ -6,7 +6,9 @@ import {
     addRandomSong, 
     searchSongs,
     getConfig,
-    saveConfig,
+    authenticate,
+    reconnect,
+    isSessionValid,
     escapeHtml 
 } from './jukeboxApi';
 import './App.css'; 
@@ -28,7 +30,7 @@ const initialState = {
     position: 0,
     lastStatusTs: 0,
     localTickStart: 0,
-    repeatMode: 'off', // 'off' | 'all' | 'one'
+    repeatMode: 'off',
     seeking: false,
     endHandledForId: null,
 };
@@ -60,13 +62,16 @@ export default function App() {
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
-    const [configForm, setConfigForm] = useState(getConfig());
+    const [configForm, setConfigForm] = useState({
+        serverUrl: 'http://localhost:4533',
+        username: '',
+        password: ''
+    });
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     
-    // Use ref to track if we're currently executing a command to prevent race conditions
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
     
-    // Keep stateRef in sync with state
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
@@ -75,15 +80,6 @@ export default function App() {
     const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
-                console.log('Updating Media Session:', {
-                    title: track.title,
-                    artist: track.artist,
-                    playing: playing,
-                    position: position,
-                    duration: track.duration
-                });
-
-                // Update metadata
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: track.title || 'Unknown',
                     artist: track.artist || 'Unknown',
@@ -96,82 +92,43 @@ export default function App() {
                     ]
                 });
 
-                // Update playback state
                 navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
-                console.log('Media Session playback state set to:', navigator.mediaSession.playbackState);
 
-                // Update position state (with strict validation)
                 try {
                     if ('setPositionState' in navigator.mediaSession) {
                         const duration = parseFloat(track.duration);
                         const pos = parseFloat(position);
                         
-                        // Only set if we have valid numbers
                         if (!isNaN(duration) && !isNaN(pos) && duration > 0) {
                             const validDuration = Math.max(0, duration);
                             const validPosition = Math.max(0, Math.min(pos, validDuration));
                             const validRate = playing ? 1.0 : 0.0;
-                            
-                            console.log('Setting position state:', {
-                                duration: validDuration,
-                                position: validPosition,
-                                playbackRate: validRate
-                            });
                             
                             navigator.mediaSession.setPositionState({
                                 duration: validDuration,
                                 playbackRate: validRate,
                                 position: validPosition
                             });
-                        } else {
-                            console.log('Skipping setPositionState - invalid values:', { duration, pos });
                         }
                     }
                 } catch (posError) {
-                    console.warn('setPositionState failed (non-critical):', posError.message);
+                    console.warn('setPositionState failed:', posError.message);
                 }
-                
-                console.log('Media Session updated successfully');
             } catch (error) {
                 console.error('Media Session API error:', error);
             }
-        } else {
-            console.warn('Media Session not available or no track loaded');
         }
     }, []);
 
     const setupMediaSessionHandlers = useCallback((handleTransport) => {
         if ('mediaSession' in navigator) {
-            console.log('Setting up Media Session action handlers...');
             try {
-                navigator.mediaSession.setActionHandler('play', () => {
-                    console.log('Media Session: Play');
-                    handleTransport('play-pause');
-                });
+                navigator.mediaSession.setActionHandler('play', () => handleTransport('play-pause'));
+                navigator.mediaSession.setActionHandler('pause', () => handleTransport('play-pause'));
+                navigator.mediaSession.setActionHandler('previoustrack', () => handleTransport('previous'));
+                navigator.mediaSession.setActionHandler('nexttrack', () => handleTransport('next'));
+                navigator.mediaSession.setActionHandler('stop', () => handleTransport('stop'));
 
-                navigator.mediaSession.setActionHandler('pause', () => {
-                    console.log('Media Session: Pause');
-                    handleTransport('play-pause');
-                });
-
-                navigator.mediaSession.setActionHandler('previoustrack', () => {
-                    console.log('Media Session: Previous');
-                    handleTransport('previous');
-                });
-
-                navigator.mediaSession.setActionHandler('nexttrack', () => {
-                    console.log('Media Session: Next');
-                    handleTransport('next');
-                });
-
-                navigator.mediaSession.setActionHandler('stop', () => {
-                    console.log('Media Session: Stop');
-                    handleTransport('stop');
-                });
-
-                console.log('Media Session handlers registered successfully');
-
-                // Seek handlers (optional, may not be supported in all browsers)
                 try {
                     navigator.mediaSession.setActionHandler('seekto', (details) => {
                         if (details.seekTime !== undefined) {
@@ -179,9 +136,7 @@ export default function App() {
                             skipTo(currentState.currentIndex, details.seekTime);
                         }
                     });
-                } catch (e) {
-                    console.debug('seekto not supported');
-                }
+                } catch (e) {}
 
                 try {
                     navigator.mediaSession.setActionHandler('seekbackward', () => {
@@ -189,9 +144,7 @@ export default function App() {
                         const newPos = Math.max(0, currentState.position - 10);
                         skipTo(currentState.currentIndex, newPos);
                     });
-                } catch (e) {
-                    console.debug('seekbackward not supported');
-                }
+                } catch (e) {}
 
                 try {
                     navigator.mediaSession.setActionHandler('seekforward', () => {
@@ -201,20 +154,15 @@ export default function App() {
                         const newPos = Math.min(maxPos, currentState.position + 10);
                         skipTo(currentState.currentIndex, newPos);
                     });
-                } catch (e) {
-                    console.debug('seekforward not supported');
-                }
+                } catch (e) {}
             } catch (error) {
                 console.error('Error setting up Media Session handlers:', error);
             }
-        } else {
-            console.warn('Media Session API not available in this browser');
         }
     }, []);
 
-    // --- Core State Refresh Logic (Polls the server) ---
+    // --- Core State Refresh Logic ---
     const refreshState = useCallback(async (forceUpdate = false) => {
-        // Don't refresh while a command is in progress unless forced
         if (!forceUpdate && commandInProgress.current) {
             return;
         }
@@ -228,7 +176,6 @@ export default function App() {
                 : (playlist?.entry ? [playlist.entry] : []);
             
             setState(prevState => {
-                // Check if track changed to reset repeat state
                 const currentTrack = newPlaylist[status.currentIndex || 0];
                 const prevTrack = prevState.playlist[prevState.currentIndex];
                 
@@ -247,12 +194,16 @@ export default function App() {
             
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
         } catch (e) {
-            setStatusText(`Error: ${e.message}. Check server or config.`);
+            if (e.message === 'Authentication failed' || e.message === 'Not authenticated') {
+                setIsAuthenticated(false);
+                setStatusText('Session expired. Please log in again.');
+            } else {
+                setStatusText(`Error: ${e.message}`);
+            }
             console.error('Refresh failed:', e);
         }
     }, []);
 
-    // Handles skipping to a specific index/offset
     const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
@@ -260,7 +211,7 @@ export default function App() {
         commandInProgress.current = true;
         try {
             await callJukebox('skip', `&index=${index}&offset=${Math.max(0, Math.floor(offsetSec))}`);
-            await refreshState(true); // Force refresh after command
+            await refreshState(true);
         } catch (e) {
             console.error(e);
         } finally {
@@ -268,7 +219,6 @@ export default function App() {
         }
     }, [refreshState]);
 
-    // Handles all transport button clicks
     const handleTransport = useCallback(async (action) => {
         const currentState = stateRef.current;
         
@@ -277,12 +227,10 @@ export default function App() {
             if (action === 'play-pause') {
                 const cmd = currentState.playing ? 'stop' : 'start';
                 await callJukebox(cmd);
-                // Immediately update local state for better UX
                 setState(prev => ({ ...prev, playing: !prev.playing }));
             } else if (action === 'next') {
                 await callJukebox('skip', `&index=${currentState.currentIndex + 1}&offset=0`);
             } else if (action === 'previous') {
-                // Restart song if pos > 3s, otherwise skip back
                 const restart = (currentState.position || 0) > 3;
                 if (restart) {
                     await callJukebox('skip', `&index=${currentState.currentIndex}&offset=0`);
@@ -309,7 +257,6 @@ export default function App() {
                 setStatusText(`Random song added: ${randomSong.title}!`);
             }
             
-            // Force refresh after command completes
             await refreshState(true);
             setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
         } catch (e) {
@@ -320,7 +267,6 @@ export default function App() {
         }
     }, [refreshState]);
 
-    // Handles actions from a queue item row
     const handleQueueAction = useCallback(async (action, index) => {
         commandInProgress.current = true;
         try {
@@ -339,12 +285,10 @@ export default function App() {
     
     // --- Effects & Listeners ---
 
-    // Setup Media Session handlers once
     useEffect(() => {
         setupMediaSessionHandlers(handleTransport);
     }, [setupMediaSessionHandlers, handleTransport]);
 
-    // Update Media Session when track or playback state changes
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
         if (currentTrack) {
@@ -352,42 +296,53 @@ export default function App() {
         }
     }, [state.currentIndex, state.playlist, state.position, state.playing, updateMediaSession]);
 
-    // Initialization - runs ONCE on mount
+    // Initialization - try to reconnect with saved credentials
     useEffect(() => {
         let mounted = true;
         
         (async function init() {
             try {
-                const saved = localStorage.getItem('jukeboxConfig');
-                if (saved) {
-                    setConfigForm(getConfig());
+                const savedConfig = getConfig();
+                if (savedConfig.serverUrl && savedConfig.username) {
+                    setConfigForm(savedConfig);
                     setStatusText('Reconnecting…');
-                    await refreshState(true);
+                    
+                    const connected = await reconnect();
                     
                     if (!mounted) return;
                     
-                    // Check current state after refresh
-                    const { playlist } = await callJukebox('get');
-                    const currentPlaylist = Array.isArray(playlist.entry) ? playlist.entry : (playlist.entry ? [playlist.entry] : []);
-                    
-                    if (mounted && currentPlaylist.length === 0) {
-                        for (let i = 0; i < 3; i++) {
-                            if (!mounted) break;
-                            await addRandomSong();
+                    if (connected) {
+                        setIsAuthenticated(true);
+                        await refreshState(true);
+                        
+                        const { playlist } = await callJukebox('get');
+                        const currentPlaylist = Array.isArray(playlist.entry) ? playlist.entry : (playlist.entry ? [playlist.entry] : []);
+                        
+                        if (mounted && currentPlaylist.length === 0) {
+                            for (let i = 0; i < 3; i++) {
+                                if (!mounted) break;
+                                await addRandomSong();
+                            }
+                            if (mounted) {
+                                await refreshState(true);
+                            }
                         }
+                        
                         if (mounted) {
-                            await refreshState(true);
+                            setStatusText('Ready');
                         }
+                    } else {
+                        setIsAuthenticated(false);
+                        setStatusText('Please log in');
                     }
-                    
-                    if (mounted) {
-                        setStatusText('Ready');
-                    }
+                } else {
+                    setStatusText('Please log in');
                 }
             } catch (e) {
                 console.error(e);
                 if (mounted) {
-                    setStatusText('Error connecting. Configure server.');
+                    setIsAuthenticated(false);
+                    setStatusText('Please log in');
                 }
             }
         })();
@@ -395,14 +350,16 @@ export default function App() {
         return () => { mounted = false; };
     }, [refreshState]);
 
-    // Polling loop - runs ONCE on mount
+    // Polling loop
     useEffect(() => {
+        if (!isAuthenticated) return;
+        
         const pollInterval = setInterval(() => {
-            refreshState(false); // Don't force during polling
+            refreshState(false);
         }, 2000);
         
         return () => clearInterval(pollInterval);
-    }, [refreshState]);
+    }, [refreshState, isAuthenticated]);
 
     // Position ticker and auto-repeat
     useEffect(() => {
@@ -417,11 +374,9 @@ export default function App() {
                 const dt = (Date.now() - prevState.lastStatusTs) / 1000;
                 let pos = Math.min(dur, prevState.localTickStart + dt);
                 
-                // End-of-song/Auto-Repeat Logic
                 if (dur > 3 && (dur - pos) <= 0.8 && prevState.endHandledForId !== tr?.id) {
                     const currentId = tr?.id;
                     if (prevState.repeatMode === 'one') {
-                        // Schedule skip on next tick
                         setTimeout(() => skipTo(prevState.currentIndex, 0), 0);
                         return { ...prevState, position: pos, endHandledForId: currentId };
                     } else if (prevState.repeatMode === 'all' && prevState.currentIndex === prevState.playlist.length - 1) {
@@ -479,7 +434,7 @@ export default function App() {
         await skipTo(currentState.currentIndex, pos);
     }, [skipTo]);
     
-    // Search Logic (Uses useEffect debounce logic)
+    // Search Logic
     useEffect(() => {
         let searchTimer;
         const q = searchQuery.trim();
@@ -517,52 +472,47 @@ export default function App() {
         }
     }, [refreshState]);
     
-    // Config Logic
+    // Login Logic (SIMPLIFIED)
     const handleConfigChange = useCallback((e) => {
         setConfigForm(f => ({ ...f, [e.target.id]: e.target.value }));
     }, []);
     
-    const handleConnect = useCallback(async () => {
+    const handleLogin = useCallback(async () => {
+        const { serverUrl, username, password } = configForm;
+        
+        if (!serverUrl || !username || !password) {
+            setStatusText('Please fill in all fields');
+            return;
+        }
+        
         try {
-            // Save config first
-            const savedConfig = saveConfig({ ...configForm });
+            setStatusText('Logging in…');
             
-            // If password was provided, show generated credentials for debugging
-            if (configForm.password && !configForm.token) {
-                console.log('Generated authentication:');
-                console.log('Token:', savedConfig.token);
-                console.log('Salt:', savedConfig.salt);
-            }
+            await authenticate(serverUrl, username, password);
             
-            setStatusText('Testing connection…');
-            
-            // Test the connection with a simple ping
-            const testUrl = `${savedConfig.serverUrl}/rest/ping?u=${encodeURIComponent(savedConfig.username)}&t=${savedConfig.token}&s=${savedConfig.salt}&v=1.16.1&c=ModernJukebox&f=json`;
-            
-            const pingRes = await fetch(testUrl);
-            const pingData = await pingRes.json();
-            
-            if (pingData?.['subsonic-response']?.status !== 'ok') {
-                throw new Error(pingData?.['subsonic-response']?.error?.message || 'Authentication failed');
-            }
-            
+            setIsAuthenticated(true);
             setStatusText('Connected! Loading player…');
+            
             await refreshState(true);
             
             const currentState = stateRef.current;
-            // Add initial song if queue is empty
             if (currentState.playlist.length === 0) {
-              await handleTransport('addRandom'); 
+                await handleTransport('addRandom');
             }
+            
             setStatusText(currentState.playing ? '▶️ Playing' : 'Ready');
             
+            // Clear password from form for security
+            setConfigForm(f => ({ ...f, password: '' }));
+            
         } catch (e) {
-            setStatusText(`Connection failed: ${e.message}`);
-            console.error('Connection error:', e);
+            setIsAuthenticated(false);
+            setStatusText(`Login failed: ${e.message}`);
+            console.error('Login error:', e);
         }
     }, [configForm, refreshState, handleTransport]);
 
-    // --- Derived State (Memoization) ---
+    // --- Derived State ---
     const currentTrack = state.playlist[state.currentIndex];
     
     const seekValue = useMemo(() => {
@@ -580,34 +530,32 @@ export default function App() {
         '--vol-fill': `${Math.round(state.gain * 100)}%`
     }), [state.gain]);
 
-    // Check if Media Session API is supported
     const hasMediaSession = 'mediaSession' in navigator;
 
     // --- RENDER ---
     return (
         <div className="player-shell">
             <aside className="cover-card">
-                <img id="cover" className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 900)} />
+                <img className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 900)} />
                 <div className="meta">
-                    <div id="title" className="title">{currentTrack?.title || 'Nothing playing'}</div>
-                    <div id="artist" className="artist">{currentTrack?.artist || '—'}</div>
-                    <div id="album" className="album">{currentTrack?.album || ''}&nbsp;</div>
+                    <div className="title">{currentTrack?.title || 'Nothing playing'}</div>
+                    <div className="artist">{currentTrack?.artist || '—'}</div>
+                    <div className="album">{currentTrack?.album || ''}&nbsp;</div>
                 </div>
             </aside>
 
             <main className="transport-card">
                 <div className="status-row">
-                    <div id="statusText">{statusText}</div>
+                    <div>{statusText}</div>
                     <div className="small">
-                        Queue: <span id="queueCount">{state.playlist.length}</span> tracks
-                        {hasMediaSession && <span> • 🎵 Media Controls Active</span>}
+                        Queue: {state.playlist.length} tracks
+                        {hasMediaSession && <span> • 🎵 Media Controls</span>}
                     </div>
                 </div>
                 
                 <div className="progress">
-                    <div id="currentTime" className="time">{fmtTime(state.position)}</div>
+                    <div className="time">{fmtTime(state.position)}</div>
                     <input 
-                        id="seek" 
                         className="seek" 
                         type="range" 
                         min="0" 
@@ -616,90 +564,68 @@ export default function App() {
                         style={seekFillStyle}
                         onChange={handleSeekChange}
                         onInput={handleSeekInput}
+                        disabled={!isAuthenticated}
                     />
-                    <div id="totalTime" className="time">{fmtTime(currentTrack?.duration || 0)}</div>
+                    <div className="time">{fmtTime(currentTrack?.duration || 0)}</div>
                 </div>
                 
                 <div>
                     <div className="controls">
                         <button 
-                            id="btnShuffle" 
                             className="btn" 
-                            title="Shuffle queue" 
-                            aria-label="Shuffle"
                             onClick={() => handleTransport('shuffle')}
-                            disabled={commandInProgress.current}>🔀</button>
+                            disabled={!isAuthenticated || commandInProgress.current}>🔀</button>
                         <button 
-                            id="btnPrev" 
                             className="btn" 
-                            title="Previous" 
-                            aria-label="Previous"
                             onClick={() => handleTransport('previous')}
-                            disabled={commandInProgress.current}>⏮️</button>
+                            disabled={!isAuthenticated || commandInProgress.current}>⏮️</button>
                         <button 
-                            id="btnPlay" 
                             className={`btn primary ${state.playing ? 'paused' : ''}`}
-                            title="Play/Pause" 
-                            aria-label="Play/Pause"
                             onClick={() => handleTransport('play-pause')}
-                            disabled={commandInProgress.current}>
+                            disabled={!isAuthenticated || commandInProgress.current}>
                             {state.playing ? '⏸️' : '▶️'}
                         </button>
                         <button 
-                            id="btnNext" 
                             className="btn" 
-                            title="Next" 
-                            aria-label="Next"
                             onClick={() => handleTransport('next')}
-                            disabled={commandInProgress.current}>⏭️</button>
+                            disabled={!isAuthenticated || commandInProgress.current}>⏭️</button>
                         <button 
-                            id="btnRepeat" 
                             className={`btn ${state.repeatMode !== 'off' ? 'active' : ''}`}
-                            title="Repeat" 
-                            aria-label="Repeat"
                             onClick={() => setState(s => ({ 
                                 ...s, 
                                 repeatMode: s.repeatMode === 'off' ? 'all' : s.repeatMode === 'all' ? 'one' : 'off'
-                            }))}>
+                            }))}
+                            disabled={!isAuthenticated}>
                             {state.repeatMode === 'one' ? '🔂1' : state.repeatMode === 'all' ? '🔂' : '🔁'}
                         </button>
                         <button 
-                            id="btnStop" 
                             className="btn warn" 
-                            title="Stop" 
-                            aria-label="Stop"
                             onClick={() => handleTransport('stop')}
-                            disabled={commandInProgress.current}>⏹️</button>
+                            disabled={!isAuthenticated || commandInProgress.current}>⏹️</button>
                         <button 
-                            id="btnClear" 
                             className="btn danger" 
-                            title="Clear queue" 
-                            aria-label="Clear"
                             onClick={() => handleTransport('clear')}
-                            disabled={commandInProgress.current}>🗑️</button>
+                            disabled={!isAuthenticated || commandInProgress.current}>🗑️</button>
                         <button 
-                            id="btnAddRandom" 
                             className="btn" 
-                            title="Add Random Song to Queue" 
-                            aria-label="Add Random"
                             onClick={() => handleTransport('addRandom')}
-                            disabled={commandInProgress.current}>🎲</button>
+                            disabled={!isAuthenticated || commandInProgress.current}>🎲</button>
                     </div>
                     
                     <div className="vol">
                         <div className="vol-row">
-                            <div title="Volume">🔊</div>
+                            <div>🔊</div>
                             <input 
-                                id="volume" 
                                 type="range" 
                                 min="0" 
                                 max="100" 
                                 value={Math.round(state.gain * 100)}
                                 style={volFillStyle}
                                 onChange={handleVolumeChange}
-                                onInput={handleVolumeChange} 
+                                onInput={handleVolumeChange}
+                                disabled={!isAuthenticated}
                             />
-                            <div id="volPct" className="volpct">{Math.round(state.gain * 100)}%</div>
+                            <div className="volpct">{Math.round(state.gain * 100)}%</div>
                         </div>
                     </div>
                 </div>
@@ -707,7 +633,7 @@ export default function App() {
 
             <aside className="side-card">
                 <h3>Queue</h3>
-                <div id="queue" className="queue" aria-label="Playlist queue">
+                <div className="queue">
                     {state.playlist.map((song, index) => (
                         <JukeboxQueueItem 
                             key={song.id || index} 
@@ -721,12 +647,12 @@ export default function App() {
                 
                 <div className="search-box">
                     <input 
-                        id="search" 
                         placeholder="Search songs to add…"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        disabled={!isAuthenticated}
                     />
-                    <div id="sresults" className="search-results" hidden={searchResults.length === 0}>
+                    <div className="search-results" hidden={searchResults.length === 0}>
                         {searchResults.map((song) => (
                             <div key={song.id} className="srow" onClick={() => addSongFromSearch(song.id)}>
                                 <img 
@@ -748,15 +674,17 @@ export default function App() {
                     <div className="row">
                         <input 
                             id="serverUrl" 
-                            placeholder="Server URL (e.g., http://localhost:4533)"
+                            placeholder="Server URL (http://localhost:4533)"
                             value={configForm.serverUrl || ''}
                             onChange={handleConfigChange}
+                            disabled={isAuthenticated}
                         />
                         <input 
                             id="username" 
                             placeholder="Username"
                             value={configForm.username || ''}
                             onChange={handleConfigChange}
+                            disabled={isAuthenticated}
                         />
                         <input 
                             id="password" 
@@ -764,24 +692,18 @@ export default function App() {
                             type="password"
                             value={configForm.password || ''}
                             onChange={handleConfigChange}
+                            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                            disabled={isAuthenticated}
                         />
-                        <input 
-                            id="token" 
-                            placeholder="Token (Advanced - optional)" 
-                            type="password"
-                            value={configForm.token || ''}
-                            onChange={handleConfigChange}
-                        />
-                         <input 
-                            id="salt" 
-                            placeholder="Salt (Advanced - optional)" 
-                            type="password"
-                            value={configForm.salt || ''}
-                            onChange={handleConfigChange}
-                        />
-                        <button id="btnConnect" onClick={handleConnect}>Save & Connect</button>
+                        <button onClick={handleLogin} disabled={isAuthenticated}>
+                            {isAuthenticated ? '✓ Logged In' : 'Login'}
+                        </button>
                     </div>
-                    <div className="small">Enter username/password for normal login, or use pre-generated token/salt for advanced authentication. Saved in <code>localStorage</code>.</div>
+                    <div className="small">
+                        {isAuthenticated 
+                            ? '✓ Connected to server. Your password is never stored.' 
+                            : 'Enter your Navidrome credentials. Password is never stored, only used to generate secure tokens.'}
+                    </div>
                 </div>
             </aside>
         </div>
