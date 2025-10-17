@@ -208,6 +208,17 @@ html, body {
   border: 1px solid var(--text-gray);
   box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
   border-radius: 2px;
+  color: var(--green-on); /* Match queue list green color */
+  text-align: center; /* Center align text */
+}
+
+/* Ensure all text in cover card uses the green color and is centered */
+.cover-card .title,
+.cover-card .artist,
+.cover-card .album {
+  color: var(--green-on);
+  text-align: center;
+  width: 100%;
 }
 
 /* right queue area */
