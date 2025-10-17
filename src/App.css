@@ -325,19 +325,17 @@ html, body {
 }
 
 .queue {
-  max-height: 580px;
-  overflow-y: auto;
-  border: 1.5px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  scroll-behavior: smooth;
+  /* use Spinnaker for the queue — fallbacks provided */
+  font-family: 'Spinnaker', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px; /* base for the queue area (easier to tweak) */
 }
 
 .qitem {
   display: grid;
   grid-template-columns: 32px 1fr 64px;
-  gap: 14px;
+  gap: 12px; /* slightly tighter now that fonts are smaller */
   align-items: center;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
   cursor: grab;
   transition: background 0.25s ease;
@@ -353,27 +351,29 @@ html, body {
 
 .qitem .idx {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px; /* smaller index */
   text-align: right;
   font-weight: 600;
 }
 
 .qitem .qi-title {
-  font-size: 15px;
+  font-size: 13px; /* reduced title size */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.1;
 }
 
 .qitem .qi-meta {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px; /* reduced meta size */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
+  line-height: 1.1;
 }
 
 .qitem .qi-actions {
