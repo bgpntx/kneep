@@ -62,6 +62,17 @@ export default function App() {
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Missing app-level state and refs (prevented runtime ReferenceError)
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [configForm, setConfigForm] = useState({ serverUrl: '', username: '', password: '' });
+    const [searchResults, setSearchResults] = useState([]);
+
+    // refs used to coordinate async commands and to give stable access to latest state
+    const commandInProgress = useRef(false);
+    const stateRef = useRef(state);
+    // keep stateRef up-to-date
+    useEffect(() => { stateRef.current = state; }, [state]);
+
     // lightweight control handler — adapt to your existing handlers.
     // Emits a CustomEvent 'jukebox-add-random' when dice pressed so you can listen elsewhere.
     function handleControl(action) {
