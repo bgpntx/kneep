@@ -93,7 +93,7 @@ html, body {
   text-overflow: ellipsis;
 }
 
-/* Center: Transport + Progress */
+/* Center: Transport + Progress  */
 .transport-card {
   background: var(--card);
   border-radius: var(--radius);
