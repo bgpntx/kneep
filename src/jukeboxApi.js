@@ -361,6 +361,47 @@ export async function searchSongs(query) {
     return data?.['subsonic-response']?.searchResult3?.song || [];
 }
 
+/**
+ * Scrobble a song to Last.fm via Navidrome.
+ * This handles both "now playing" updates and full scrobbles.
+ * @param {string} id The ID of the song to scrobble.
+ * @param {boolean} submission If true, it's a full scrobble. If false, it updates "Now Playing".
+ * @returns {Promise<void>}
+ */
+export async function scrobble(id, submission = false) {
+    if (!isSessionValid() || !id) {
+        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.');
+        return;
+    }
+
+    const extra = `&id=${encodeURIComponent(id)}&submission=${submission}`;
+    const url = `${config.serverUrl}/rest/scrobble?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json${extra}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            if (DEBUG()) console.warn(`Scrobble API returned HTTP ${res.status}`);
+            return;
+        }
+        
+        const data = await res.json();
+        const resp = data?.['subsonic-response'];
+
+        if (DEBUG()) {
+            const type = submission ? 'Scrobble' : 'Now Playing';
+            console.log(`${type} response for ID ${id}:`, data);
+        }
+
+        if (resp?.status !== 'ok') {
+            if (DEBUG()) console.warn(`Scrobble API error: ${resp?.error?.message}`);
+        }
+        
+    } catch (error) {
+        if (DEBUG()) console.error('Scrobble call failed:', error.message);
+    }
+}
+
+
 // --- Config Management (SIMPLIFIED) ---
 
 export function getConfig() {
@@ -443,3 +484,4 @@ export async function reconnect() {
         return false;
     }
 }
+
