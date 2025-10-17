@@ -332,8 +332,9 @@ html, body {
 
 .qitem {
   display: grid;
-  grid-template-columns: 32px 1fr 64px;
-  gap: 12px; /* slightly tighter now that fonts are smaller */
+  /* reserve a stable actions area so buttons never slide over titles */
+  grid-template-columns: 36px 1fr minmax(96px, 140px);
+  gap: 12px;
   align-items: center;
   padding: 10px 12px;
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
@@ -361,6 +362,7 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0; /* allow flex/grid to shrink title properly */
   font-weight: 600;
   color: var(--text);
   line-height: 1.1;
@@ -378,25 +380,27 @@ html, body {
 
 .qitem .qi-actions {
   display: inline-flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
+  justify-self: end;    /* keep actions inside their column */
+  min-width: 96px;     /* match the reserved column */
 }
 
-.qitem .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: rgba(124, 58, 237, 0.18);
-  color: #c4b5fd;
-  font-weight: 600;
+/* compact action buttons inside queue to prevent overlap */
+.qitem .qi-actions .btn {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: none;
+  border-width: 1px;
 }
 
-.qitem.current {
-  background: rgba(124, 58, 237, 0.2);
-  box-shadow: 0 0 10px var(--accent);
+/* give titles a little right buffer so text never touches the action area */
+.qitem .qi-title,
+.qitem .qi-meta {
+  padding-right: 12px;
 }
 
 /* Search */
