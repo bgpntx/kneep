@@ -47,7 +47,7 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction }) {
             <div className="idx">{index + 1}</div>
             <div>
                 <div className="qi-title">{escapeHtml(song.title || 'Unknown')}</div>
-                <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')} • {escapeHtml(song.album || '')}</div>
+                <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
             </div>
             <div className="qi-actions">
                 <button title="Play here" className="btn" onClick={() => onAction('play', index)}>▶️</button>

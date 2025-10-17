@@ -370,8 +370,10 @@ html, body {
   line-height: 1.1;
 }
 
-/* keep actions inside the third column and right aligned */
+/* compact "More" menu for queue items (collapse secondary actions) */
 .qitem .qi-actions {
+  /* keep existing inline-flex layout but be a positioning context for the menu */
+  position: relative;
   display: inline-flex;
   gap: var(--q-action-gap);
   align-items: center;
@@ -379,11 +381,10 @@ html, body {
   justify-self: end;
   padding-left: 6px;
   pointer-events: auto;
-  z-index: 10;      /* render above row backgrounds but inside the card */
-  visibility: visible;
+  z-index: 10;
 }
 
-/* much tighter consistent action button sizing to avoid overlap */
+/* visible quick action(s) */
 .qitem .qi-actions .btn {
   width: var(--q-action-btn);
   height: var(--q-action-btn);
@@ -400,12 +401,70 @@ html, body {
   flex: 0 0 var(--q-action-btn);
 }
 
-/* reduce the reserved action column at narrow widths */
-@media (max-width: 520px) {
-  :root { --q-actions-w: 88px; --q-action-btn: 28px; }
-  .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); }
-  .qitem .qi-actions .btn { width: var(--q-action-btn); height: var(--q-action-btn); }
-  .side-card { padding-right: 22px; }
+/* "more" toggle button */
+.qitem .qi-actions .btn.more {
+  width: var(--q-action-btn);
+  height: var(--q-action-btn);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.03);
+  font-weight: 700;
+}
+
+/* hidden menu (popout) for secondary actions */
+.qitem .qi-actions .more-menu {
+  position: absolute;
+  right: calc(100% + 8px); /* open to the left of the actions area */
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.45);
+  min-width: 40px;
+  white-space: nowrap;
+  z-index: 40; /* render above list rows */
+}
+
+/* show menu when toggled open */
+.qitem .qi-actions.open .more-menu {
+  display: flex;
+}
+
+/* hide secondary actions inline; they appear in the more-menu when open */
+.qitem .qi-actions .btn[data-role="secondary"] {
+  display: none;
+}
+
+/* when menu is open, show secondary buttons inside it */
+.qitem .qi-actions.open .more-menu .btn[data-role="secondary"] {
+  display: inline-flex;
+  width: 44px;
+  height: 36px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+/* on very wide screens show secondaries inline and hide the more button */
+@media (min-width: 1400px) {
+  .qitem .qi-actions .btn[data-role="secondary"] {
+    display: inline-flex;
+  }
+  .qitem .qi-actions .btn.more {
+    display: none;
+  }
+}
+
+/* accessibility: ensure menu and toggle are keyboard friendly */
+.qitem .qi-actions .btn.more:focus {
+  outline: 3px solid rgba(124,58,237,0.18);
+  outline-offset: 3px;
 }
 
 /* Search */
