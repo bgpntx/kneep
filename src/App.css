@@ -2,22 +2,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Spinnaker&display=swap');
 
 :root {
-  --bg1: #12141f;
-  --bg2: #1c2033;
-  --card: rgba(255, 255, 255, 0.08);
-  --muted: #9aa3ba;
-  --text: #e0e4f7;
-  --accent: #7c3aed; /* Modern Violet */
-  --accent-2: #16a34a; /* Bright Green */
-  --danger: #dc2626;
-  --warn: #d97706;
-  --shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
-  --radius: 20px;
-  --transition: 0.3s ease;
+  --bg1: #1b1b1b;
+  --bg2: #111111;
+  --card: #2c2c2c;
+  --muted: #a0b0a0;
+  --text: #00ffcc;           /* Winamp greenish text */
+  --accent: #00baff;         /* Teal/blue highlight */
+  --accent-2: #ffcc00;       /* Amber highlight */
+  --danger: #ff0033;
+  --warn: #ffaa00;
+  --shadow: 0 0 10px rgba(0,0,0,0.8);
+  --radius: 4px;
+  --transition: 0.2s ease;
 
   /* Queue action sizing tokens */
-  --q-actions-w: 120px;   /* width reserved for actions column */
-  --q-action-btn: 34px;   /* visual button square */
+  --q-actions-w: 120px;
+  --q-action-btn: 32px;
   --q-action-gap: 8px;
 
   --left-min: 260px;
@@ -28,11 +28,11 @@
   --inner-gap: 20px;
 
   /* Button design tokens */
-  --btn-bg: rgba(255,255,255,0.04);
-  --btn-border: rgba(255,255,255,0.06);
-  --btn-shadow: 0 6px 16px rgba(8,10,16,0.55);
-  --btn-ring: rgba(124,58,237,0.16);
-  --btn-radius: 12px;
+  --btn-bg: #333333;
+  --btn-border: #555555;
+  --btn-shadow: inset 0 1px 0 #666666, 0 0 6px rgba(0,255,204,0.2);
+  --btn-ring: rgba(0,186,255,0.35);
+  --btn-radius: 3px;
 
   --btn-size: 50px;
   --btn-primary-size: 64px;
@@ -46,12 +46,12 @@
   width: var(--btn-size);
   height: var(--btn-size);
   border-radius: var(--btn-radius);
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  background: linear-gradient(180deg, #333333, #111111);
   border: 1px solid var(--btn-border);
   color: var(--text);
   box-shadow: var(--btn-shadow);
   cursor: pointer;
-  transition: transform 160ms cubic-bezier(.2,.9,.25,1), box-shadow 160ms ease, background 160ms ease, opacity 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, opacity 120ms ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -60,10 +60,10 @@
 .btn.primary {
   width: var(--btn-primary-size);
   height: var(--btn-primary-size);
-  background: linear-gradient(180deg, var(--accent), #5b21b6);
-  border: none;
-  color: #fff;
-  box-shadow: 0 18px 40px rgba(124,58,237,0.16), inset 0 -4px 8px rgba(0,0,0,0.18);
+  background: linear-gradient(180deg, var(--accent), #0077aa);
+  border: 1px solid #00ccff;
+  color: #001a19;
+  box-shadow: 0 0 10px rgba(0,186,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.35);
 }
 
 /* Dice / special action */
@@ -97,17 +97,18 @@
 
 /* hover / active / focus */
 .btn:hover {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 14px 30px rgba(8,10,16,0.55);
-  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, #444444, #222222);
+  box-shadow: 0 0 6px rgba(0,255,204,0.6);
 }
 .btn:active {
-  transform: translateY(0) scale(0.985);
-  box-shadow: 0 6px 14px rgba(8,10,16,0.45);
+  transform: translateY(0) scale(0.98);
+  background: linear-gradient(180deg, #2d2d2d, #0f0f0f);
+  box-shadow: 0 0 4px rgba(0,0,0,0.8) inset;
 }
 .btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 6px var(--btn-ring), 0 12px 30px rgba(8,10,16,0.5);
+  box-shadow: 0 0 0 3px var(--btn-ring), 0 0 10px rgba(0,186,255,0.5);
 }
 
 /* disabled state */
@@ -148,25 +149,27 @@
 html, body {
   height: 100%;
   margin: 0;
-  /* use Spinnaker app-wide, fall back to system fonts */
-  font-family: 'Spinnaker', "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Lucida Console", Monaco, monospace;
   color: var(--text);
-  background: radial-gradient(1300px 700px at 15% -15%, #2a1e6a 0%, transparent 55%),
-              radial-gradient(1100px 900px at 115% 25%, #0d4773 0%, transparent 55%),
-              linear-gradient(180deg, var(--bg1), var(--bg2));
+  background:
+    repeating-linear-gradient(0deg, #202020, #202020 1px, #1a1a1a 2px),
+    linear-gradient(180deg, var(--bg1), var(--bg2));
   display: grid;
   place-items: center;
-  padding: 32px;
+  padding: 24px;
 }
 
 /* Winamp-style 3-vertical-fields layout: controls | cover | queue */
 .player-shell {
-  /* left: controls (narrow) | middle: cover (medium) | right: queue (flex) */
   grid-template-columns: 200px 360px 1fr;
   grid-template-areas: "controls cover queue";
   gap: 14px;
   max-width: 1100px;
-  padding: 18px;
+  padding: 16px;
+  background: repeating-linear-gradient(0deg, #222222, #222222 1px, #1d1d1d 2px);
+  border: 2px solid #333333;
+  box-shadow: 0 0 15px rgba(0,0,0,0.8);
+  border-radius: 3px;
 }
 
 /* assign areas */
@@ -178,6 +181,10 @@ html, body {
   gap: 12px;
   align-items: center;
   justify-content: flex-start;
+  background: linear-gradient(180deg, #2a2a2a, #181818);
+  border: 1px solid #4d4d4d;
+  box-shadow: inset 0 1px 0 #666, inset 0 -1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
+  border-radius: 3px;
 }
 
 /* middle cover area */
@@ -189,6 +196,10 @@ html, body {
   gap: 14px;
   align-items: center;
   justify-content: flex-start;
+  background: linear-gradient(180deg, #2a2a2a, #181818);
+  border: 1px solid #4d4d4d;
+  box-shadow: inset 0 1px 0 #666, inset 0 -1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
+  border-radius: 3px;
 }
 
 /* right queue area */
@@ -196,6 +207,13 @@ html, body {
   grid-area: queue;
   padding: 14px 18px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(180deg, #2a2a2a, #181818);
+  border: 1px solid #4d4d4d;
+  box-shadow: inset 0 1px 0 #666, inset 0 -1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
+  border-radius: 3px;
 }
 
 /* transport controls: horizontal Winamp-like bar */
@@ -257,8 +275,15 @@ html, body {
   gap: 12px;
   align-items: center;
   padding: 10px 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
   min-height: 56px;
+  background: #111111;
+  border-bottom: 1px solid #333333;
+  color: #00ffcc;
+  font-family: "Lucida Console", Monaco, monospace;
+}
+.qitem:hover {
+  background: #1f1f1f;
+  color: #ffcc00;
 }
 
 /* clamp title to one line for compact queue */
@@ -290,4 +315,3 @@ html, body {
   }
   .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 }
-
