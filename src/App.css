@@ -18,6 +18,15 @@
   --card-border: rgba(255,255,255,0.06);
   --btn-radius: 12px;
   --control-gap: 12px;
+
+  /* Slider sizing tokens (easy to tweak) */
+  --seek-thumb: 14px;
+  --seek-thumb-border: 2px;
+  --seek-track-h: 8px;
+
+  --vol-thumb: 12px;
+  --vol-thumb-border: 2px;
+  --vol-track-h: 8px;
 }
 
 * {
@@ -134,105 +143,105 @@ body {
   min-width: 48px;
 }
 
+/* Centered, smaller seek control (thumbs reduced so dot aligns) */
 .seek {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  /* make the control the same height as the thumb so the thumb is centered */
-  height: 18px;
+  /* make the control just tall enough for the thumb so it visually centers */
+  height: calc(var(--seek-thumb) + (var(--seek-thumb-border) * 2));
   border-radius: 999px;
-  /* draw a visually-thinner track centered inside the taller control */
+  /* thinner track centered inside the input */
   background: linear-gradient(90deg, var(--accent) var(--seek-fill, 0%), rgba(255, 255, 255, 0.16) var(--seek-fill, 0%));
   background-repeat: no-repeat;
-  background-size: 100% 10px; /* track appears 10px tall and centered */
+  background-size: 100% var(--seek-track-h);
   background-position: center;
   outline: none;
   cursor: pointer;
   padding: 0;
 }
 
-/* WebKit track/thumb alignment */
+/* WebKit track/thumb alignment for seek */
 .seek::-webkit-slider-runnable-track {
-  height: 10px;
+  height: var(--seek-track-h);
   border-radius: 999px;
-  background: transparent; /* we use background on the input to draw the track */
+  background: transparent;
 }
 .seek::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: var(--seek-thumb);
+  height: var(--seek-thumb);
   border-radius: 50%;
   background: #fff;
-  border: 3px solid var(--accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  border: var(--seek-thumb-border) solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: grab;
-  /* ensure thumb sits centered in the taller input box */
-  margin-top: 0;
+  margin-top: 0; /* input height already accounts for centering */
   transform: translateY(0);
 }
 
-/* Firefox track/thumb alignment */
+/* Firefox seek track/thumb */
 .seek::-moz-range-track {
-  height: 10px;
+  height: var(--seek-track-h);
   border-radius: 999px;
   background: transparent;
 }
 .seek::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: var(--seek-thumb);
+  height: var(--seek-thumb);
   border-radius: 50%;
   background: #fff;
-  border: 3px solid var(--accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  border: var(--seek-thumb-border) solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: grab;
   transform: translateY(0);
 }
 
-/* Volume control — same approach as seek to keep thumbs aligned */
+/* Volume control — smaller thumb to visually match seek */
 .vol input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 18px;
+  height: calc(var(--vol-thumb) + (var(--vol-thumb-border) * 2));
   border-radius: 999px;
   background: linear-gradient(90deg, #22c55e var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%));
   background-repeat: no-repeat;
-  background-size: 100% 10px;
+  background-size: 100% var(--vol-track-h);
   background-position: center;
   cursor: pointer;
   padding: 0;
 }
 
 .vol input[type="range"]::-webkit-slider-runnable-track {
-  height: 10px;
+  height: var(--vol-track-h);
   border-radius: 999px;
   background: transparent;
 }
 .vol input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: var(--vol-thumb);
+  height: var(--vol-thumb);
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #22c55e;
+  border: var(--vol-thumb-border) solid #22c55e;
   cursor: grab;
   margin-top: 0;
   transform: translateY(0);
 }
 
 .vol input[type="range"]::-moz-range-track {
-  height: 10px;
+  height: var(--vol-track-h);
   border-radius: 999px;
   background: transparent;
 }
 .vol input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: var(--vol-thumb);
+  height: var(--vol-thumb);
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #22c55e;
+  border: var(--vol-thumb-border) solid #22c55e;
   cursor: grab;
   transform: translateY(0);
 }
@@ -390,45 +399,45 @@ body {
 .vol input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  height: 18px;
+  height: calc(var(--vol-thumb) + (var(--vol-thumb-border) * 2));
   border-radius: 999px;
   background: linear-gradient(90deg, #22c55e var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%));
   background-repeat: no-repeat;
-  background-size: 100% 10px;
+  background-size: 100% var(--vol-track-h);
   background-position: center;
   cursor: pointer;
   padding: 0;
 }
 
 .vol input[type="range"]::-webkit-slider-runnable-track {
-  height: 10px;
+  height: var(--vol-track-h);
   border-radius: 999px;
   background: transparent;
 }
 .vol input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: var(--vol-thumb);
+  height: var(--vol-thumb);
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #22c55e;
+  border: var(--vol-thumb-border) solid #22c55e;
   cursor: grab;
   margin-top: 0;
   transform: translateY(0);
 }
 
 .vol input[type="range"]::-moz-range-track {
-  height: 10px;
+  height: var(--vol-track-h);
   border-radius: 999px;
   background: transparent;
 }
 .vol input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: var(--vol-thumb);
+  height: var(--vol-thumb);
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #22c55e;
+  border: var(--vol-thumb-border) solid #22c55e;
   cursor: grab;
   transform: translateY(0);
 }
