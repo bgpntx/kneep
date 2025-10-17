@@ -1,4 +1,4 @@
-// src/App.jsx - Simplified Authentication
+// src/App.jsx - Simplified Authentication with Auto-Remove Played Songs
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
     callJukebox, 
@@ -67,6 +67,8 @@ export default function App() {
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
+    const prevIndexRef = useRef(state.currentIndex);
+    
     useEffect(() => { stateRef.current = state; }, [state]);
 
     // --- Media Session API Integration ---
@@ -353,6 +355,29 @@ export default function App() {
         
         return () => clearInterval(pollInterval);
     }, [refreshState, isAuthenticated]);
+
+    // Auto-remove finished songs when moving to next track
+    useEffect(() => {
+        const prevIndex = prevIndexRef.current;
+        const currentIndex = state.currentIndex;
+        
+        // If currentIndex increased (moved to next song) and repeat is not 'one'
+        if (currentIndex > prevIndex && state.repeatMode !== 'one' && state.playlist.length > 0) {
+            // Remove the previous song that just finished
+            (async () => {
+                try {
+                    await callJukebox('remove', `&index=${prevIndex}`);
+                    // After removal, refresh to get updated queue
+                    // The currentIndex will be adjusted automatically by the server
+                    await refreshState(true);
+                } catch (e) {
+                    console.error('Failed to auto-remove finished song:', e);
+                }
+            })();
+        }
+        
+        prevIndexRef.current = currentIndex;
+    }, [state.currentIndex, state.repeatMode, state.playlist.length, refreshState]);
 
     // Position ticker and auto-repeat
     useEffect(() => {
