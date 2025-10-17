@@ -138,13 +138,25 @@ body {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 10px;
+  /* make the control the same height as the thumb so the thumb is centered */
+  height: 18px;
   border-radius: 999px;
+  /* draw a visually-thinner track centered inside the taller control */
   background: linear-gradient(90deg, var(--accent) var(--seek-fill, 0%), rgba(255, 255, 255, 0.16) var(--seek-fill, 0%));
+  background-repeat: no-repeat;
+  background-size: 100% 10px; /* track appears 10px tall and centered */
+  background-position: center;
   outline: none;
   cursor: pointer;
+  padding: 0;
 }
 
+/* WebKit track/thumb alignment */
+.seek::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent; /* we use background on the input to draw the track */
+}
 .seek::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -155,15 +167,139 @@ body {
   border: 3px solid var(--accent);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   cursor: grab;
+  /* ensure thumb sits centered in the taller input box */
+  margin-top: 0;
+  transform: translateY(0);
 }
 
+/* Firefox track/thumb alignment */
+.seek::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
 .seek::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
   background: #fff;
   border: 3px solid var(--accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   cursor: grab;
+  transform: translateY(0);
+}
+
+/* Volume control — same approach as seek to keep thumbs aligned */
+.vol input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%));
+  background-repeat: no-repeat;
+  background-size: 100% 10px;
+  background-position: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.vol input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+.vol input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #22c55e;
+  cursor: grab;
+  margin-top: 0;
+  transform: translateY(0);
+}
+
+.vol input[type="range"]::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+.vol input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #22c55e;
+  cursor: grab;
+  transform: translateY(0);
+}
+
+/* Modernize control buttons to flat circular icons with subtle elevation */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  width: 44px;
+  border-radius: 999px; /* circular */
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 6px 18px rgba(8, 10, 16, 0.55), inset 0 1px 0 rgba(255,255,255,0.02);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 160ms cubic-bezier(.2,.9,.25,1), box-shadow 160ms ease, background 160ms ease;
+  font-size: 18px;
+  padding: 0;
+}
+
+/* subtle raise on hover and a gentle scale for tactile feel */
+.btn:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 12px 28px rgba(8, 10, 16, 0.6);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Primary play/pause stands out as a filled circular button */
+.btn.primary {
+  height: 56px;
+  width: 56px;
+  font-size: 20px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent), #6d28d9);
+  border: none;
+  color: #fff;
+  box-shadow: 0 18px 40px rgba(139,92,246,0.14), inset 0 -3px 0 rgba(0,0,0,0.18);
+}
+
+.btn.primary.paused {
+  background: linear-gradient(180deg, var(--accent-2), #16a34a);
+}
+
+/* a compact variant for queue/action icons (keeps layout consistent) */
+.btn.compact {
+  height: 36px;
+  width: 36px;
+  font-size: 14px;
+  border-radius: 8px;
+  box-shadow: none;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ensure icons/text inside buttons are centered and don't overflow */
+.btn > i, .btn > svg, .btn > img {
+  display: block;
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+  line-height: 1;
 }
 
 .controls {
@@ -254,12 +390,21 @@ body {
 .vol input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  height: 10px;
+  height: 18px;
   border-radius: 999px;
   background: linear-gradient(90deg, #22c55e var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%));
+  background-repeat: no-repeat;
+  background-size: 100% 10px;
+  background-position: center;
   cursor: pointer;
+  padding: 0;
 }
 
+.vol input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
 .vol input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -269,14 +414,23 @@ body {
   background: #fff;
   border: 2px solid #22c55e;
   cursor: grab;
+  margin-top: 0;
+  transform: translateY(0);
 }
 
+.vol input[type="range"]::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
 .vol input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: #fff;
   border: 2px solid #22c55e;
+  cursor: grab;
+  transform: translateY(0);
 }
 
 .vol .volpct {
@@ -506,27 +660,6 @@ body {
   .config input {
     font-size: 16px; /* Prevents zoom on iOS */
   }
-}
-
-/* slider track consistency across engines */
-.seek::-webkit-slider-runnable-track {
-  height: 10px;
-  border-radius: 999px;
-  background: transparent;
-}
-.seek::-moz-range-track {
-  height: 10px;
-  border-radius: 999px;
-}
-
-.vol input[type="range"]::-webkit-slider-runnable-track {
-  height: 10px;
-  border-radius: 999px;
-  background: transparent;
-}
-.vol input[type="range"]::-moz-range-track {
-  height: 10px;
-  border-radius: 999px;
 }
 
 /* visually-hidden helper for screen readers */
