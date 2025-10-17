@@ -19,6 +19,13 @@
   --q-actions-w: 120px;   /* width reserved for actions column */
   --q-action-btn: 34px;   /* visual button square */
   --q-action-gap: 8px;
+
+  --left-min: 260px;
+  --left-max: 320px;
+  --right-min: 260px;
+  --right-max: 360px;
+  --center-fr: 1.3fr;
+  --inner-gap: 20px;
 }
 
 * {
@@ -41,23 +48,26 @@ html, body {
 
 .player-shell {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1100px;                      /* slightly narrower overall for denser layout */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
-  padding: 28px;
+  padding: 22px;                          /* reduce padding a touch */
   display: grid;
-  grid-template-columns: minmax(320px, 380px) 1fr minmax(320px, 380px);
-  gap: 28px;
+  grid-template-columns: 
+    minmax(var(--left-min), var(--left-max))   /* cover column */
+    var(--center-fr)                            /* transport / player gets most of the room */
+    minmax(var(--right-min), var(--right-max)); /* queue column */
+  gap: var(--inner-gap);                  /* smaller gap between columns */
 }
 
 /* Left: Cover + Track Info */
 .cover-card {
   background: var(--card);
   border-radius: var(--radius);
-  padding: 22px 24px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -67,7 +77,7 @@ html, body {
 .cover {
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 18px;
+  border-radius: 14px;
   object-fit: cover;
   background: #292e43;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
@@ -103,7 +113,7 @@ html, body {
 .transport-card {
   background: var(--card);
   border-radius: var(--radius);
-  padding: 24px 28px;
+  padding: 18px 20px;
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 20px;
@@ -186,8 +196,8 @@ html, body {
 
 .controls {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(7, minmax(0, 1fr)); /* fewer columns => larger controls */
+  gap: 10px;
   align-items: center;
   justify-items: center;
 }
@@ -318,7 +328,7 @@ html, body {
 .side-card {
   background: var(--card);
   border-radius: var(--radius);
-  padding: 22px 32px 22px 24px;
+  padding: 16px 20px;
   display: grid;
   gap: 20px;
   position: relative;
