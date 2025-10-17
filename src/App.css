@@ -315,6 +315,10 @@ html, body {
   padding: 22px 24px;
   display: grid;
   gap: 20px;
+  position: relative;
+  overflow: hidden; /* prevent action buttons from drawing outside the card */
+  /* ensure queue uses Spinnaker (import already at top) */
+  font-family: 'Spinnaker', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 .side-card h3 {
@@ -329,58 +333,57 @@ html, body {
 /* stronger layout guard for qitems to avoid overlap */
 .qitem {
   display: grid;
-  /* left index + title column (title gets the flexible space) */
-  grid-template-columns: 40px 1fr;
+  /* index | title | actions (fixed) — stable column prevents overlap */
+  grid-template-columns: 40px 1fr 104px;
   gap: 12px;
   align-items: center;
   padding: 10px 16px;
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
   cursor: grab;
   transition: background 0.25s ease;
-  position: relative; /* make actions absolutely positioned relative to item */
+  position: relative;
 }
 
 /* title must be able to shrink and keep a buffer for the action buttons */
 .qitem .qi-title {
-  min-width: 0;
-  padding-right: 64px; /* reserve visual space for absolute actions (adjust if you change button size) */
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.1;
-}
+   min-width: 0;
+   padding-right: 8px;
+   font-size: 13px;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   font-weight: 600;
+   color: var(--text);
+   line-height: 1.1;
+ }
 
 .qitem .qi-meta {
-  padding-right: 64px;    /* same buffer */
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+   padding-right: 8px;
+   color: var(--muted);
+   font-size: 11px;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+ }
 
 /* absolutely position actions to the right of each qitem so they never push into the title */
 .qitem .qi-actions {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
+  /* keep actions inside the third column and right aligned */
   display: inline-flex;
   gap: 8px;
   align-items: center;
-  z-index: 2;
+  justify-content: flex-end;
+  justify-self: end;
+  padding-left: 6px;
   pointer-events: auto;
 }
 
 /* compact action buttons inside queue to avoid overlap */
 .qitem .qi-actions .btn {
-  width: 36px;
-  height: 36px;
-  font-size: 13px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+  border-radius: 8px;
   padding: 0;
   box-shadow: none;
   border-width: 1px;
@@ -389,12 +392,11 @@ html, body {
 /* keep small viewports working */
 @media (max-width: 420px) {
   .qitem {
-    grid-template-columns: 28px 1fr;
+    grid-template-columns: 28px 1fr 80px;
     padding-right: 12px;
   }
-  .qitem .qi-actions .btn { width: 30px; height: 30px; font-size: 12px; }
-  .qitem .qi-title,
-  .qitem .qi-meta { padding-right: 56px; }
+  .qitem .qi-actions .btn { width: 28px; height: 28px; font-size: 11px; }
+  .qitem .qi-title, .qitem .qi-meta { padding-right: 6px; }
 }
 
 /* Search */
@@ -601,45 +603,3 @@ html, body {
   }
 }
 
-// Attach simple toggles for the per-item "more" menus
-function initQueueMoreMenus() {
-  // guard
-  if (typeof document === 'undefined') return;
-
-  // delegate: handle click on any .btn.more
-  document.addEventListener('click', (e) => {
-    const more = e.target.closest('.qi-actions .btn.more, .qi-actions .btn.more *');
-    if (more) {
-      // find parent .qi-actions
-      const actions = more.closest('.qi-actions');
-      // toggle open state
-      actions.classList.toggle('open');
-      // stop propagation so the document click handler doesn't immediately close it
-      e.stopPropagation();
-      return;
-    }
-
-    // click outside: close any open menus
-    document.querySelectorAll('.qi-actions.open').forEach((el) => el.classList.remove('open'));
-  });
-
-  // close menus on ESC and support keyboard opening (Enter/Space)
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      document.querySelectorAll('.qi-actions.open').forEach((el) => el.classList.remove('open'));
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      const focused = document.activeElement;
-      if (focused && focused.matches('.qi-actions .btn.more')) {
-        focused.closest('.qi-actions')?.classList.toggle('open');
-        e.preventDefault();
-      }
-    }
-  });
-}
-
-// Call once app mounted / DOM ready
-if (typeof window !== 'undefined') {
-  // If using React, move this call into a useEffect in the component that renders the queue
-  window.requestAnimationFrame(initQueueMoreMenus);
-}
