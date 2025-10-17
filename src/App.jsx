@@ -61,21 +61,23 @@ export default function App() {
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
-    const [configForm, setConfigForm] = useState({
-        serverUrl: '',
-        username: '',
-        password: ''
-    });
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    
-    const commandInProgress = useRef(false);
-    const stateRef = useRef(state);
-    
-    useEffect(() => {
-        stateRef.current = state;
-    }, [state]);
+
+    // lightweight control handler — adapt to your existing handlers.
+    // Emits a CustomEvent 'jukebox-add-random' when dice pressed so you can listen elsewhere.
+    function handleControl(action) {
+        if (action === 'togglePlay') {
+            setState(s => ({ ...s, playing: !s.playing }));
+            return;
+        }
+        if (action === 'addRandom') {
+            // app code can listen for this event and add a random track
+            window.dispatchEvent(new CustomEvent('jukebox-add-random'));
+            return;
+        }
+        // otherwise notify via CustomEvent (you can wire listeners to implement prev/next/shuffle)
+        window.dispatchEvent(new CustomEvent('jukebox-control', { detail: { action } }));
+        console.log('control:', action);
+    }
 
     // --- Media Session API Integration ---
     const updateMediaSession = useCallback((track, position, playing) => {
@@ -545,30 +547,17 @@ export default function App() {
                 </div>
             </aside>
 
+            {/* Transport / controls (horizontal Winamp-style). Replace existing block where appropriate. */}
             <div className="transport-card">
                 <div className="controls">
-                    <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>
-                        ⏮
-                    </button>
-
-                    {/* Primary play / pause (no separate stop button) */}
-                    <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
-                        {state.playing ? '⏸' : '▶'}
-                    </button>
-
-                    <button className="btn" title="Next" onClick={() => handleTransport('next')}>
-                        ⏭
-                    </button>
-
-                    <button className="btn" title="Shuffle" onClick={() => handleTransport('shuffle')}>
-                        🔀
-                    </button>
-
-                    <button className="btn" title="Repeat" onClick={() => handleTransport('repeat')}>
-                        🔁
-                    </button>
-
-                    {/* add other compact controls as needed, but omit Stop (Pause covers it) */}
+                  <button className="btn" title="Previous" onClick={() => handleControl('prev')}>⏮</button>
+                  <button className="btn" title="Rewind" onClick={() => handleControl('rewind')}>⏪</button>
+                  <button className="btn primary" title="Play / Pause" onClick={() => handleControl('togglePlay')}>
+                    {state.playing ? '⏸' : '▶'}
+                  </button>
+                  <button className="btn" title="Next" onClick={() => handleControl('next')}>⏭</button>
+                  <button className="btn" title="Shuffle" onClick={() => handleControl('shuffle')}>🔀</button>
+                  <button className="btn dice" title="Add random track" onClick={() => handleControl('addRandom')}>🎲</button>
                 </div>
 
                 <div className="progress">

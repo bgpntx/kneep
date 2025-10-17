@@ -85,35 +85,86 @@ html, body {
   overflow: hidden;
 }
 
-/* vertical Winamp-like controls (left column) */
+/* transport controls: horizontal Winamp-like bar */
 .transport-card .controls {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;    /* horizontal */
   gap: 10px;
   align-items: center;
+  justify-content: center; /* center horizontally */
   width: 100%;
+  flex-wrap: wrap;
+  padding: 6px 0;
 }
 
-/* make buttons compact and stacked for Winamp feel */
+/* slightly smaller horizontal buttons for neatness */
 .transport-card .btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
-  font-size: 18px;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* primary (play/pause) slightly larger */
+/* keep primary a bit larger/stronger */
 .transport-card .btn.primary {
-  width: 72px;
-  height: 72px;
-  font-size: 20px;
-  border-radius: 12px;
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
 }
 
-/* tighten spacing for the whole UI */
-.cover-card .meta { gap: 6px; }
-.side-card { gap: 12px; }
+/* dice (random) visual tweak */
+.transport-card .btn.dice {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* make the right column (queue) use vertical space better and scroll */
+.side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+  /* ensure the queue list can scroll independently */
+}
+
+/* queue list area should take available vertical space and scroll */
+.queue-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 6px; /* avoid horizontal overlap with action buttons */
+}
+
+/* ensure each qitem is compact and consistent height */
+.qitem {
+  display: grid;
+  grid-template-columns: 40px 1fr var(--q-actions-w);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  min-height: 56px;
+}
+
+/* clamp title to one line for compact queue */
+.qitem .qi-title {
+  display: block;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* responsive: reduce button size and action column on narrow screens */
+@media (max-width: 520px) {
+  .transport-card .btn { width: 44px; height: 44px; }
+  .transport-card .btn.primary { width: 56px; height: 56px; }
+  :root { --q-actions-w: 88px; --q-action-btn: 28px; }
+  .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; }
+}
 
 /* responsive fallback (stack vertically on small screens) */
 @media (max-width: 900px) {
@@ -126,6 +177,4 @@ html, body {
   }
   .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 }
-
-/* ...existing code... */
 
