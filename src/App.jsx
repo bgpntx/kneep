@@ -61,7 +61,7 @@ function md5(string) {
     for (k = 0; k < x.length; k += 16) {
         AA = a; BB = b; CC = c; DD = d;
         a = FF(a, b, c, d, x[k + 0], S11, 0xD76AA478); d = FF(d, a, b, c, x[k + 1], S12, 0xE8C7B756); c = FF(c, d, a, b, x[k + 2], S13, 0x242070DB); b = FF(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE); a = FF(a, b, c, d, x[k + 4], S11, 0xF57C0FAF); d = FF(d, a, b, c, x[k + 5], S12, 0x4787C62A); c = FF(c, d, a, b, x[k + 6], S13, 0xA8304613); b = FF(b, c, d, a, x[k + 7], S14, 0xFD469501); a = FF(a, b, c, d, x[k + 8], S11, 0x698098D8); d = FF(d, a, b, c, x[k + 9], S12, 0x8B44F7AF); c = FF(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1); b = FF(b, c, d, a, x[k + 11], S14, 0x895CD7BE); a = FF(a, b, c, d, x[k + 12], S11, 0x6B901122); d = FF(d, a, b, c, x[k + 13], S12, 0xFD987193); c = FF(c, d, a, b, x[k + 14], S13, 0xA679438E); b = FF(b, c, d, a, x[k + 15], S14, 0x49B40821);
-        a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562); d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340); c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51); b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA); a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D); d = GG(d, a, b, c, x[k + 10], S22, 0x02441453); c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681); b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8); a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6); d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6); c = FF(c, d, a, b, x[k + 3], S23, 0xF4D50D87); b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED); a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905); d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8); c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9); b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
+        a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562); d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340); c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51); b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA); a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D); d = GG(d, a, b, c, x[k + 10], S22, 0x02441453); c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681); b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8); a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6); d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6); c = GG(c, d, a, b, x[k + 3], S23, 0xF4D50D87); b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED); a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905); d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8); c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9); b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
         a = HH(a, b, c, d, x[k + 5], S31, 0xFFFA3942); d = HH(d, a, b, c, x[k + 8], S32, 0x8771F681); c = HH(c, d, a, b, x[k + 11], S33, 0x6D9D6122); b = HH(b, c, d, a, x[k + 14], S34, 0xFDE5380C); a = HH(a, b, c, d, x[k + 1], S31, 0xA4BEEA44); d = HH(d, a, b, c, x[k + 4], S32, 0x4BDECFA9); c = HH(c, d, a, b, x[k + 7], S33, 0xF6BB4B60); b = HH(b, c, d, a, x[k + 10], S34, 0xBEBFBC70); a = HH(a, b, c, d, x[k + 13], S31, 0x289B7EC6); d = HH(d, a, b, c, x[k + 0], S32, 0xEAA127FA); c = HH(c, d, a, b, x[k + 3], S33, 0xD4EF3085); b = HH(b, c, d, a, x[k + 6], S34, 0x04881D05); a = HH(a, b, c, d, x[k + 9], S31, 0xD9D4D039); d = HH(d, a, b, c, x[k + 12], S32, 0xE6DB99E5); c = HH(c, d, a, b, x[k + 15], S33, 0x1FA27CF8); b = HH(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
         a = II(a, b, c, d, x[k + 0], S41, 0xF4292244); d = II(d, a, b, c, x[k + 7], S42, 0x432AFF97); c = II(c, d, a, b, x[k + 14], S43, 0xAB9423A7); b = II(b, c, d, a, x[k + 5], S44, 0xFC93A039); a = II(a, b, c, d, x[k + 12], S41, 0x655B59C3); d = II(d, a, b, c, x[k + 3], S42, 0x8F0CCC92); c = II(c, d, a, b, x[k + 10], S43, 0xFFEFF47D); b = II(b, c, d, a, x[k + 1], S44, 0x85845DD1); a = II(a, b, c, d, x[k + 8], S41, 0x6FA87E4F); d = II(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0); c = II(c, d, a, b, x[k + 6], S43, 0xA3014314); b = II(b, c, d, a, x[k + 13], S44, 0x4E0811A1); a = II(a, b, c, d, x[k + 4], S41, 0xF7537E82); d = II(d, a, b, c, x[k + 11], S42, 0xBD3AF235); c = II(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB); b = II(b, c, d, a, x[k + 9], S44, 0xEB86D391);
         a = addUnsigned(a, AA); b = addUnsigned(b, BB); c = addUnsigned(c, CC); d = addUnsigned(d, DD);
@@ -191,9 +191,15 @@ const styles = `
       --shadow: 0 0 8px rgba(0,0,0,0.7);
       --radius: 2px;
       --transition: 0.15s ease;
-      --q-actions-w: 80px;
+      --q-actions-w: 120px;
       --q-action-btn: 32px;
       --q-action-gap: 8px;
+      --left-min: 260px;
+      --left-max: 320px;
+      --right-min: 260px;
+      --right-max: 360px;
+      --center-fr: 1.3fr;
+      --inner-gap: 20px;
       --btn-bg: var(--base-dark);
       --btn-border: var(--bevel-hi);
       --btn-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
@@ -216,7 +222,7 @@ const styles = `
     .btn.flat { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); box-shadow: none; transform: none; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; font-family: "Lucida Console", Monaco, monospace; color: var(--text); background: rgb(33, 33, 49); display: grid; place-items: center; padding: 24px; }
-    .player-shell { display: grid; grid-template-columns: 200px 360px 1fr; grid-template-areas: "controls cover queue"; gap: 14px; max-width: 1100px; padding: 16px; background: rgb(48, 47, 74); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo); border-radius: 2px; }
+    .player-shell { grid-template-columns: 200px 360px 1fr; grid-template-areas: "controls cover queue"; gap: 14px; max-width: 1100px; padding: 16px; background: rgb(48, 47, 74); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo); border-radius: 2px; }
     .transport-card { grid-area: controls; padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: flex-start; background: rgb(45, 44, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; }
     .cover-card { grid-area: cover; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: flex-start; background: rgb(45, 45, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; color: var(--green-on); text-align: center; }
     .cover-card .cover { width: 320px; height: 320px; max-width: 100%; aspect-ratio: 1/1; border-radius: 4px; object-fit: cover; background: var(--playlist-bg); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); }
@@ -230,24 +236,21 @@ const styles = `
     .queue-list { flex: 1 1 auto; overflow-y: auto; padding-right: 6px; background: var(--playlist-bg); }
     .qitem { display: grid; grid-template-columns: 40px 1fr var(--q-actions-w); gap: 12px; align-items: center; padding: 10px 8px; min-height: 56px; background: var(--playlist-bg); border-bottom: 1px solid var(--bevel-lo); color: var(--green-on); font-family: "Lucida Console", Monaco, monospace; }
     .qitem:hover { background: #0a0a0a; }
-    .qitem.current { background: var(--blue-bar); color: var(--blue-text); }
+    .qitem.is-active, .qitem.active, .qitem.selected { background: var(--blue-bar); color: var(--blue-text); }
     .qitem .qi-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .qitem .qi-actions { display: flex; gap: var(--q-action-gap); justify-content: flex-end; }
     .qitem .btn { background: #1a1a1a; border: 1px solid var(--green-on); color: var(--green-on); box-shadow: inset 0 1px 0 rgba(0, 255, 0, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.5); }
     .qitem .btn:hover { background: #2a2a2a; border-color: var(--green-on); box-shadow: 0 0 4px var(--green-on); }
     .qitem .btn:active { background: var(--blue-bar); border-color: var(--blue-text); color: var(--blue-text); }
     @media (max-width: 520px) { .transport-card .btn { width: 44px; height: 44px; } .transport-card .btn.primary { width: 56px; height: 56px; } :root { --q-actions-w: 88px; --q-action-btn: 28px; } .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; } .cover-card .cover { width: 240px; height: 240px; } }
     @media (max-width: 900px) { .player-shell { grid-template-columns: 1fr; grid-template-areas: "cover" "controls" "queue"; } .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; } .cover-card .cover { width: 280px; height: 280px; } }
+    /* Additional styles from original App.css that might be needed */
     .progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; }
     .time { font-size: 12px; color: var(--text-gray); }
-    .seek { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: linear-gradient(to right, var(--green-on) var(--seek-fill, 0%), var(--bevel-lo) var(--seek-fill, 0%)); border-radius: 4px; outline: none; cursor: pointer; }
-    .seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--green-on); border: 2px solid var(--base-dark); border-radius: 50%; cursor: pointer; }
-    .seek::-moz-range-thumb { width: 16px; height: 16px; background: var(--green-on); border: 2px solid var(--base-dark); border-radius: 50%; cursor: pointer; }
+    .seek { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: var(--bevel-lo); border-radius: 4px; outline: none; }
+    .seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--bevel-hi); border-radius: 50%; cursor: pointer; }
     .vol { margin-top: 10px; width: 100%; }
     .vol-row { display: flex; align-items: center; gap: 8px; }
-    .vol input[type="range"] { -webkit-appearance: none; appearance: none; flex: 1; height: 8px; background: linear-gradient(to right, var(--green-on) var(--vol-fill, 100%), var(--bevel-lo) var(--vol-fill, 100%)); border-radius: 4px; outline: none; cursor: pointer;}
-    .vol input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--green-on); border: 2px solid var(--base-dark); border-radius: 50%; cursor: pointer; }
-    .vol input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; background: var(--green-on); border: 2px solid var(--base-dark); border-radius: 50%; cursor: pointer; }
+    input[type="range"] { flex: 1; }
     .queue { flex: 1; overflow-y: auto; background-color: var(--playlist-bg); border: 1px solid var(--bevel-lo); padding: 5px; }
     .search-box { margin-top: 10px; }
     .search-box input { width: 100%; padding: 8px; background: var(--playlist-bg); border: 1px solid var(--bevel-lo); color: var(--green-on); }
@@ -300,8 +303,8 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction }) {
                 <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
             </div>
             <div className="qi-actions">
-                <button title="Play here" className="btn compact" onClick={() => onAction('play', index)}>▶️</button>
-                <button title="Remove" className="btn compact" onClick={() => onAction('remove', index)}>✖️</button>
+                <button title="Play here" className="btn" onClick={() => onAction('play', index)}>▶️</button>
+                <button title="Remove" className="btn" onClick={() => onAction('remove', index)}>✖️</button>
             </div>
         </div>
     );
@@ -822,7 +825,7 @@ export default function App() {
                     </div>
                 </aside>
 
-                <main className="transport-card">
+                <div className="transport-card">
                      <div className="status-row">
                         <div id="statusText">{statusText}</div>
                         <div className="small">Queue: <span id="queueCount">{state.playlist.length}</span> tracks</div>
@@ -861,7 +864,7 @@ export default function App() {
                             <div className="volpct">{Math.round(state.gain * 100)}%</div>
                         </div>
                     </div>
-                </main>
+                </div>
 
                 <aside className="side-card">
                     <h3>Queue</h3>
@@ -916,4 +919,3 @@ export default function App() {
         </>
     );
 }
-
