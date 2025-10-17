@@ -26,6 +26,104 @@
   --right-max: 360px;
   --center-fr: 1.3fr;
   --inner-gap: 20px;
+
+  /* Button design tokens */
+  --btn-bg: rgba(255,255,255,0.04);
+  --btn-border: rgba(255,255,255,0.06);
+  --btn-shadow: 0 6px 16px rgba(8,10,16,0.55);
+  --btn-ring: rgba(124,58,237,0.16);
+  --btn-radius: 12px;
+
+  --btn-size: 50px;
+  --btn-primary-size: 64px;
+}
+
+/* Base button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border-radius: var(--btn-radius);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid var(--btn-border);
+  color: var(--text);
+  box-shadow: var(--btn-shadow);
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(.2,.9,.25,1), box-shadow 160ms ease, background 160ms ease, opacity 120ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Primary (play/pause) */
+.btn.primary {
+  width: var(--btn-primary-size);
+  height: var(--btn-primary-size);
+  background: linear-gradient(180deg, var(--accent), #5b21b6);
+  border: none;
+  color: #fff;
+  box-shadow: 0 18px 40px rgba(124,58,237,0.16), inset 0 -4px 8px rgba(0,0,0,0.18);
+}
+
+/* Dice / special action */
+.btn.dice {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.04);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
+}
+
+/* compact variant for queue */
+.btn.compact {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+/* hover / active / focus */
+.btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 14px 30px rgba(8,10,16,0.55);
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+}
+.btn:active {
+  transform: translateY(0) scale(0.985);
+  box-shadow: 0 6px 14px rgba(8,10,16,0.45);
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 6px var(--btn-ring), 0 12px 30px rgba(8,10,16,0.5);
+}
+
+/* disabled state */
+.btn[disabled], .btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ensure icons (emoji/svg) scale cleanly */
+.btn > svg, .btn > i, .btn > img {
+  width: 56%;
+  height: 56%;
+  display: block;
+  object-fit: contain;
+}
+
+/* small-screen adjustments */
+@media (max-width: 520px) {
+  :root { --btn-size: 44px; --btn-primary-size: 56px; }
+  .btn.compact { width: 30px; height: 30px; }
+}
+
+/* Optional retro/flat variant (use .btn.flat) */
+.btn.flat {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  box-shadow: none;
+  transform: none;
 }
 
 * {
