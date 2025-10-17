@@ -63,8 +63,8 @@ export default function App() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [configForm, setConfigForm] = useState({
-        serverUrl: 'http://localhost:4533',
-        username: '',
+        serverUrl: 'http://localnest:4533',
+        username: 'bgpntx',
         password: ''
     });
     const [isAuthenticated, setIsAuthenticated] = useState(false);
