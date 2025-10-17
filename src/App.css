@@ -14,6 +14,11 @@
   --shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
   --radius: 20px;
   --transition: 0.3s ease;
+
+  /* Queue action sizing tokens */
+  --q-actions-w: 120px;   /* width reserved for actions column */
+  --q-action-btn: 34px;   /* visual button square */
+  --q-action-gap: 8px;
 }
 
 * {
@@ -313,12 +318,12 @@ html, body {
 .side-card {
   background: var(--card);
   border-radius: var(--radius);
-  padding: 22px 24px;
+  padding: 22px 32px 22px 24px;
   display: grid;
   gap: 20px;
   position: relative;
-  /* allow action buttons to draw above the list (prevents accidental clipping) */
-  overflow: visible;
+  /* keep extra room on the right so action buttons never draw outside the rounded card */
+  overflow: hidden;
   /* ensure queue uses Spinnaker (import already at top) */
   font-family: 'Spinnaker', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -335,8 +340,9 @@ html, body {
 /* stronger layout guard for qitems to avoid overlap */
 .qitem {
   display: grid;
-  /* index | title | actions (fixed) — stable column prevents overlap */
-  grid-template-columns: 40px 1fr 104px;
+  /* index | title | actions (fixed) — stable column prevents overlap.
+     use the variable above so it's easy to tweak globally */
+  grid-template-columns: 40px 1fr var(--q-actions-w);
   gap: 12px;
   align-items: center;
   padding: 10px 16px;
@@ -344,72 +350,62 @@ html, body {
   cursor: grab;
   transition: background 0.25s ease;
   position: relative;
+  /* create a stacking context so z-index works predictably per-row */
+  isolation: isolate;
 }
 
-/* title: allow wrapping (up to 2 lines) so long names format correctly;
-   meta stays single-line and muted */
+/* ensure title area never flows under actions */
 .qitem .qi-title {
-   min-width: 0;
-   padding-right: 8px;
-   font-size: 13px;
-   /* allow up to two lines with ellipsis */
-   display: -webkit-box;
-   -webkit-line-clamp: 2;
-   -webkit-box-orient: vertical;
-   white-space: normal;
-   overflow: hidden;
-   text-overflow: ellipsis;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1.1;
-  }
-
-.qitem .qi-meta {
-   padding-right: 8px;
-   color: var(--muted);
-   font-size: 11px;
-   white-space: nowrap;
-   overflow: hidden;
-   text-overflow: ellipsis;
- }
+  min-width: 0; /* critical for truncation inside grid */
+  padding-right: 8px;
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+}
 
 /* keep actions inside the third column and right aligned */
 .qitem .qi-actions {
   display: inline-flex;
-  gap: 8px;
+  gap: var(--q-action-gap);
   align-items: center;
   justify-content: flex-end;
   justify-self: end;
   padding-left: 6px;
   pointer-events: auto;
-  z-index: 20;      /* ensure actions render above list rows */
+  z-index: 10;      /* render above row backgrounds but inside the card */
   visibility: visible;
 }
 
-/* compact action buttons inside queue to avoid overlap */
+/* much tighter consistent action button sizing to avoid overlap */
 .qitem .qi-actions .btn {
-  width: 32px;
-  height: 32px;
+  width: var(--q-action-btn);
+  height: var(--q-action-btn);
   font-size: 12px;
   border-radius: 8px;
   padding: 0;
   box-shadow: none;
   border-width: 1px;
-  background: rgba(255,255,255,0.04); /* ensure buttons are visible on dark bg */
+  background: rgba(255,255,255,0.04);
   color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 var(--q-action-btn);
 }
 
-/* keep small viewports working */
-@media (max-width: 420px) {
-  .qitem {
-    grid-template-columns: 28px 1fr 80px;
-    padding-right: 12px;
-  }
-  .qitem .qi-actions .btn { width: 28px; height: 28px; font-size: 11px; }
-  .qitem .qi-title, .qitem .qi-meta { padding-right: 6px; }
+/* reduce the reserved action column at narrow widths */
+@media (max-width: 520px) {
+  :root { --q-actions-w: 88px; --q-action-btn: 28px; }
+  .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); }
+  .qitem .qi-actions .btn { width: var(--q-action-btn); height: var(--q-action-btn); }
+  .side-card { padding-right: 22px; }
 }
 
 /* Search */
