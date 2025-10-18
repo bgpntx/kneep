@@ -134,7 +134,10 @@ async function searchSongs(query) {
     return data?.['subsonic-response']?.searchResult3?.song || [];
 }
 async function scrobble(id, submission = false) {
-    if (!isSessionValid() || !id) { if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.'); return; }
+    if (!isSessionValid() || !id) { 
+        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.'); 
+        return; 
+    }
     const extra = `&id=${encodeURIComponent(id)}&submission=${submission}`;
     const url = `${config.serverUrl}/rest/scrobble?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json${extra}`;
     try {
@@ -629,19 +632,60 @@ export default function App() {
         return () => { mounted = false; };
     }, [refreshState]);
 
-    // Polling loop
+    // *** FIX: MODIFIED POLLING LOOP ***
+    // Polling loop (and authoritative scrobble check)
     useEffect(() => {
         if (!isAuthenticated) return;
         
-        const pollInterval = setInterval(() => {
-            // Only poll if the document is visible
-            if (document.hidden === false) {
-                 refreshState(false);
+        const pollInterval = setInterval(async () => {
+            // *** FIX: Removed `if (document.hidden === false)` check ***
+            // This allows background polling to keep state and scrobble logic working.
+            try {
+                await refreshState(false);
+            } catch (e) {
+                console.error("Background poll refresh failed:", e);
+                // Don't stop the loop, just log the error
+                return;
             }
-        }, 2000);
+            
+            // --- SCROBBLE LOGIC MOVED HERE ---
+            // Get the most recent state after refresh
+            const currentState = stateRef.current;
+            const tr = currentState.playlist[currentState.currentIndex];
+            
+            if (!tr) return; // Nothing to scrobble
+            
+            const dur = Math.max(0, tr.duration || 0);
+            const pos = currentState.position; // Use authoritative position
+            
+            // Check if song is eligible and hasn't been scrobbled yet
+            if (dur > 30 && !scrobbledIds.has(tr.id)) {
+                const isHalfway = pos >= dur / 2;
+                const isFourMinutes = pos >= 240; // 4 minutes
+
+                if (isHalfway || isFourMinutes) {
+                    if (DEBUG()) console.log(`Scrobbling (from poll): ${tr.title}`);
+                    scrobble(tr.id, true); // true for a full scrobble
+                    
+                    // Update scrobble state
+                    setScrobbledIds(prev => new Set(prev).add(tr.id));
+                    
+                    setStatusText(`Scrobbled: ${tr.title}`);
+                    setTimeout(() => {
+                        const latestState = stateRef.current;
+                        // Only set status if it hasn't been changed by something else
+                        if (statusText === `Scrobbled: ${tr.title}`) {
+                            setStatusText(latestState.playing ? '▶️ Playing' : '⏸️ Paused');
+                        }
+                    }, 3000);
+                }
+            }
+            // --- END OF MOVED SCROBBLE LOGIC ---
+
+        }, 2000); // Poll every 2 seconds
         
         return () => clearInterval(pollInterval);
-    }, [refreshState, isAuthenticated]);
+    }, [refreshState, isAuthenticated, scrobbledIds, statusText]); // Added dependencies
 
     // *** FIX 2: UPDATED Auto-remove finished songs logic ***
     useEffect(() => {
@@ -694,47 +738,35 @@ export default function App() {
         }
     }, [state.playing, state.currentIndex, state.playlist]);
     
-    // Position ticker, auto-repeat, and scrobbling logic
+    // *** FIX: MODIFIED Position Ticker ***
+    // Position ticker (for UI visual update only)
     useEffect(() => {
         const tickInterval = setInterval(() => {
             const currentState = stateRef.current;
-            if (!currentState.playing || currentState.seeking) {
+            // Only tick if the tab is visible and playing
+            if (document.hidden || !currentState.playing || currentState.seeking) {
                 return;
             }
 
             const tr = currentState.playlist[currentState.currentIndex];
             const dur = Math.max(0, tr?.duration || 0);
+            // Calculate visual-only position
             const dt = (Date.now() - currentState.lastStatusTs) / 1000;
             const pos = Math.min(dur, currentState.localTickStart + dt);
-
-            // --- Full Scrobble Logic ---
-            if (tr && dur > 30 && !scrobbledIds.has(tr.id)) {
-                const isHalfway = pos >= dur / 2;
-                const isFourMinutes = pos >= 240; // 4 minutes
-
-                if (isHalfway || isFourMinutes) {
-                    scrobble(tr.id, true); // true for a full scrobble
-                    setScrobbledIds(prev => new Set(prev).add(tr.id));
-                    setStatusText(`Scrobbled: ${tr.title}`);
-                    setTimeout(() => {
-                        const latestState = stateRef.current;
-                        setStatusText(latestState.playing ? '▶️ Playing' : '⏸️ Paused');
-                    }, 3000);
-                }
-            }
             
             setState(prev => {
                 // If the song has changed, reset the scrobbled set for the new song
+                // This is important for the *next* song's scrobble check
                 if (prev.playlist[prev.currentIndex]?.id !== tr?.id) {
                     setScrobbledIds(new Set());
                 }
                 return { ...prev, position: pos };
             });
             
-        }, 500);
+        }, 500); // UI ticks every 500ms
 
         return () => clearInterval(tickInterval);
-    }, [scrobbledIds]);
+    }, []); // Empty dependency array, this effect runs once and manages its own state via refs
 
     // Volume Change Handler
     const handleVolumeChange = useCallback(async (e) => {
@@ -772,7 +804,7 @@ export default function App() {
         const currentState = stateRef.current;
         const tr = currentState.playlist[currentState.currentIndex];
         const dur = Math.max(0, tr?.duration || 0);
-        const pos = (Number(e.taget.value) / 1000) * dur;
+        const pos = (Number(e.target.value) / 1000) * dur;
         
         setState(prev => ({ ...prev, seeking: false }));
         await skipTo(currentState.currentIndex, pos);
