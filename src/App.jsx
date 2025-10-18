@@ -328,7 +328,7 @@ export default function App() {
     
     useEffect(() => {
         const fontLink = document.createElement('link');
-        fontLink.href = 'https://fonts.googleapis.com/css2?family=Spinnaker&display=swap';
+        fontLink.href = 'https.googleapis.com/css2?family=Spinnaker&display=swap';
         fontLink.rel = 'stylesheet';
         document.head.appendChild(fontLink);
         return () => { document.head.removeChild(fontLink); };
@@ -543,6 +543,27 @@ export default function App() {
     
     // --- Effects & Listeners ---
 
+    // *** FIX 1: Add this effect to handle tab visibility ***
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            // Check if the page is NOT hidden (i.e., it just became visible)
+            if (document.hidden === false && isAuthenticated) {
+                if (DEBUG()) console.log('Page became visible, forcing state refresh.');
+                // Force a refresh, bypassing the 'commandInProgress' check
+                // because the state is guaranteed to be stale.
+                refreshState(true);
+            }
+        };
+
+        // Add the event listener when the component mounts
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Clean up the event listener when the component unmounts
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [refreshState, isAuthenticated]); // Add refreshState and isAuthenticated as dependencies
+
     useEffect(() => {
         setupMediaSessionHandlers(handleTransport);
     }, [setupMediaSessionHandlers, handleTransport]);
@@ -613,29 +634,52 @@ export default function App() {
         if (!isAuthenticated) return;
         
         const pollInterval = setInterval(() => {
-            refreshState(false);
+            // Only poll if the document is visible
+            if (document.hidden === false) {
+                 refreshState(false);
+            }
         }, 2000);
         
         return () => clearInterval(pollInterval);
     }, [refreshState, isAuthenticated]);
 
-    // Auto-remove finished songs when moving to next track
+    // *** FIX 2: UPDATED Auto-remove finished songs logic ***
     useEffect(() => {
         const prevIndex = prevIndexRef.current;
         const currentIndex = state.currentIndex;
         
+        // Check if the index has advanced AND we are not in 'one' repeat mode
         if (currentIndex > prevIndex && state.repeatMode !== 'one' && state.playlist.length > 0) {
+            
             (async () => {
                 try {
-                    await callJukebox('remove', `&index=${prevIndex}`);
-                    await refreshState(true);
+                    // Create a list of all indexes that finished
+                    const indexesToRemove = [];
+                    for (let i = prevIndex; i < currentIndex; i++) {
+                        indexesToRemove.push(i);
+                    }
+                    
+                    if (indexesToRemove.length > 0) {
+                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s).`);
+                        
+                        // We must remove them in REVERSE order
+                        // to not mess up the indexes of the tracks still in the queue.
+                        for (const index of indexesToRemove.reverse()) {
+                            await callJukebox('remove', `&index=${index}`);
+                        }
+                        
+                        // After all removals, do one final refresh to sync state
+                        await refreshState(true);
+                    }
                 } catch (e) {
-                    console.error('Failed to auto-remove finished song:', e);
+                    console.error('Failed to auto-remove finished song(s):', e);
                 }
             })();
         }
         
+        // Always update the prevIndexRef *after* the logic
         prevIndexRef.current = currentIndex;
+        
     }, [state.currentIndex, state.repeatMode, state.playlist.length, refreshState]);
 
     // "Now Playing" update effect
@@ -728,7 +772,7 @@ export default function App() {
         const currentState = stateRef.current;
         const tr = currentState.playlist[currentState.currentIndex];
         const dur = Math.max(0, tr?.duration || 0);
-        const pos = (Number(e.target.value) / 1000) * dur;
+        const pos = (Number(e.taget.value) / 1000) * dur;
         
         setState(prev => ({ ...prev, seeking: false }));
         await skipTo(currentState.currentIndex, pos);
