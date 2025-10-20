@@ -11,3 +11,18 @@
 .vol input[type="range"]::-moz-range-thumb {
   border: 2px solid var(--green-on);
 }
+
+/* Force volume slider to match green styling */
+#volume {
+  background: linear-gradient(90deg, var(--green-on) var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%)) !important;
+}
+
+#volume::-webkit-slider-thumb {
+  background: #fff;
+  border: 2px solid var(--green-on);
+}
+
+#volume::-moz-range-thumb {
+  background: #fff;
+  border: 2px solid var(--green-on);
+}
