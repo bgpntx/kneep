@@ -224,7 +224,24 @@ const styles = `
     @media (max-width: 520px) { :root { --btn-size: 44px; --btn-primary-size: 56px; } .btn.compact { width: 30px; height: 30px; } .btn.shuffle { width: var(--btn-size); height: var(--btn-size); } }
     .btn.flat { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); box-shadow: none; transform: none; }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; font-family: "Lucida Console", Monaco, monospace; color: var(--text); background: rgb(33, 33, 49); display: grid; place-items: center; padding: 24px; }
+    
+    /* MODIFICATION HERE */
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      font-family: "Lucida Console", Monaco, monospace; 
+      color: var(--text); 
+      background: rgb(33, 33, 49); 
+      display: grid; 
+      place-items: center; 
+      /* Use env() to respect safe areas, with 24px fallback */
+      padding-top: env(safe-area-inset-top, 24px);
+      padding-right: env(safe-area-inset-right, 24px);
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+      padding-left: env(safe-area-inset-left, 24px);
+    }
+    /* END MODIFICATION */
+
     .player-shell { grid-template-columns: 200px 360px 1fr; grid-template-areas: "controls cover queue"; gap: 14px; max-width: 1100px; padding: 16px; background: rgb(48, 47, 74); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo); border-radius: 2px; }
     .transport-card { grid-area: controls; padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: flex-start; background: rgb(45, 44, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; }
     .cover-card { grid-area: cover; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: flex-start; background: rgb(45, 45, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; color: var(--green-on); text-align: center; }
