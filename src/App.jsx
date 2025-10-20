@@ -225,7 +225,8 @@ const styles = `
     .btn.flat { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); box-shadow: none; transform: none; }
     * { box-sizing: border-box; }
     
-    /* MODIFICATION HERE */
+    /* --- MODIFICATION 1 --- */
+    /* Remove padding and keep desktop-first centering */
     html, body { 
       height: 100%; 
       margin: 0; 
@@ -233,16 +234,25 @@ const styles = `
       color: var(--text); 
       background: rgb(33, 33, 49); 
       display: grid; 
-      place-items: center; 
-      /* Use env() to respect safe areas, with 24px fallback */
-      padding-top: env(safe-area-inset-top, 24px);
-      padding-right: env(safe-area-inset-right, 24px);
-      padding-bottom: env(safe-area-inset-bottom, 24px);
-      padding-left: env(safe-area-inset-left, 24px);
+      place-items: center;
+      padding: 0; /* Removed safe-area padding from here */
     }
-    /* END MODIFICATION */
 
-    .player-shell { grid-template-columns: 200px 360px 1fr; grid-template-areas: "controls cover queue"; gap: 14px; max-width: 1100px; padding: 16px; background: rgb(48, 47, 74); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo); border-radius: 2px; }
+    /* --- MODIFICATION 2 --- */
+    /* Add display:grid and max-height for desktop */
+    .player-shell { 
+      display: grid; /* <-- ADDED */
+      grid-template-columns: 200px 360px 1fr; 
+      grid-template-areas: "controls cover queue"; 
+      gap: 14px; 
+      max-width: 1100px; 
+      max-height: 95vh; /* <-- ADDED */
+      padding: 16px; 
+      background: rgb(48, 47, 74); 
+      border: 1px solid var(--text-gray); 
+      box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo); 
+      border-radius: 2px; 
+    }
     .transport-card { grid-area: controls; padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: flex-start; background: rgb(45, 44, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; }
     .cover-card { grid-area: cover; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: flex-start; background: rgb(45, 45, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; color: var(--green-on); text-align: center; }
     .cover-card .cover { width: 320px; height: 320px; max-width: 100%; aspect-ratio: 1/1; border-radius: 4px; object-fit: cover; background: var(--playlist-bg); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); }
@@ -262,7 +272,55 @@ const styles = `
     .qitem .btn:hover { background: #2a2a2a; border-color: var(--green-on); box-shadow: 0 0 4px var(--green-on); }
     .qitem .btn:active { background: var(--blue-bar); border-color: var(--blue-text); color: var(--blue-text); }
     @media (max-width: 520px) { .transport-card .btn { width: 44px; height: 44px; } .transport-card .btn.primary { width: 56px; height: 56px; } :root { --q-actions-w: 88px; --q-action-btn: 28px; } .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; } .cover-card .cover { width: 240px; height: 240px; } }
-    @media (max-width: 900px) { .player-shell { grid-template-columns: 1fr; grid-template-areas: "cover" "controls" "queue"; } .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; } .cover-card .cover { width: 280px; height: 280px; } }
+    
+    /* --- MODIFICATION 3 --- */
+    /* Add rules for mobile layout */
+    @media (max-width: 900px) { 
+      /* Override body centering */
+      html, body {
+        display: block;
+        height: 100%;
+        overflow: hidden; /* Prevent body scroll */
+      }
+
+      /* --- MODIFICATION 4 --- */
+      /* Make shell full-screen and define rows */
+      .player-shell {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "cover"
+          "controls"
+          "queue";
+        /* Define rows: cover/controls auto, queue fills rest */
+        grid-template-rows: auto auto 1fr; 
+        
+        /* Fullscreen dimensions */
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        max-height: 100%;
+        border: none;
+        border-radius: 0;
+        gap: 10px;
+        
+        /* Add safe-area padding here */
+        padding-top: env(safe-area-inset-top, 10px);
+        padding-right: env(safe-area-inset-right, 10px);
+        padding-bottom: env(safe-area-inset-bottom, 10px);
+        padding-left: env(safe-area-inset-left, 10px);
+      } 
+      .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      .cover-card .cover {
+        width: 280px;
+        height: 280px;
+      }
+      /* Ensure side-card (queue) can shrink */
+      .side-card {
+        min-height: 0;
+        padding: 10px;
+      }
+    }
+    
     /* Additional styles from original App.css that might be needed */
     .progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; }
     .time { font-size: 12px; color: var(--text-gray); }
