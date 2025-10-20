@@ -210,6 +210,10 @@ const styles = `
       --btn-radius: 2px;
       --btn-size: 50px;
       --btn-primary-size: 64px;
+      /* Mobile-specific settings */
+      --mobile-padding: 12px;
+      --queue-height-desktop: 500px;
+      --queue-height-mobile: 40vh;
     }
     .btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-size); height: var(--btn-size); border-radius: var(--btn-radius); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); cursor: pointer; transition: transform 120ms ease, background 120ms ease, opacity 120ms ease; user-select: none; -webkit-tap-highlight-color: transparent; }
     .btn.primary { width: var(--btn-primary-size); height: var(--btn-primary-size); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); }
