@@ -271,6 +271,62 @@ const styles = `
     .config button { cursor: pointer; background: var(--bevel-hi); border: 1px solid var(--bevel-lo); }
     .config .small { font-size: 11px; color: var(--text-gray); }
     .status-row { display: flex; justify-content: space-between; width: 100%; font-size: 12px; }
+
+    @media (max-width: 520px) {
+      html, body {
+        padding: 0;
+        background: #000;
+      }
+
+      .player-shell {
+        all: unset;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        min-height: 100vh;
+        padding: 0;
+      }
+
+      .cover-card, .transport-card, .side-card {
+        all: unset;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .cover-card .cover {
+        width: 100%;
+        height: auto;
+        border-radius: 6px;
+      }
+
+      .transport-card .controls {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn {
+        flex: 1 1 auto;
+        max-width: 64px;
+        font-size: 20px;
+      }
+
+      .btn.primary {
+        max-width: 80px;
+        font-size: 24px;
+      }
+
+      .status-row, .progress, .vol, .queue {
+        width: 100%;
+      }
+
+      .queue {
+        max-height: 40vh;
+        overflow-y: auto;
+      }
+    }
 `;
 
 // --- UTILITY FUNCTIONS ---
