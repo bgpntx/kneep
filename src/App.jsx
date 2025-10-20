@@ -223,19 +223,19 @@ const styles = `
     .btn > svg, .btn > i, .btn > img { width: 56%; height: 56%; display: block; object-fit: contain; }
     * { box-sizing: border-box; }
 
-    /* --- BASE DESKTOP STYLES (ORIGINAL) --- */
+    /* --- BASE DESKTOP STYLES (ORIGINAL, UNTOUCHED) --- */
     html, body {
         height: 100%;
         margin: 0;
         font-family: "Lucida Console", Monaco, monospace;
         color: var(--text);
         background: rgb(33, 33, 49);
-        display: grid; /* Centers the player-shell on desktop */
-        place-items: center; /* Centers the player-shell on desktop */
+        display: grid;
+        place-items: center;
         padding: 24px;
      }
     .player-shell {
-        display: grid; /* Added this from original CSS file */
+        display: grid;
         grid-template-columns: 200px 360px 1fr;
         grid-template-areas: "controls cover queue";
         gap: 14px;
@@ -245,7 +245,7 @@ const styles = `
         border: 1px solid var(--text-gray);
         box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo);
         border-radius: 2px;
-        max-height: 95vh; /* Added to prevent overflow on shorter screens */
+        max-height: 95vh;
     }
     .transport-card { grid-area: controls; padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: flex-start; background: rgb(45, 44, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; }
     .cover-card { grid-area: cover; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: flex-start; background: rgb(45, 45, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; color: var(--green-on); text-align: center; }
@@ -256,6 +256,7 @@ const styles = `
     .transport-card .btn { width: 50px; height: 50px; border-radius: 8px; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; }
     .transport-card .btn.primary { width: 64px; height: 64px; font-size: 18px; }
     .transport-card .btn.dice { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.05); }
+    /* .side-card rule duplicated, using the second one */
     .side-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
     .queue-list { flex: 1 1 auto; overflow-y: auto; padding-right: 6px; background: var(--playlist-bg); }
     .qitem { display: grid; grid-template-columns: 40px 1fr var(--q-actions-w); gap: 12px; align-items: center; padding: 10px 8px; min-height: 56px; background: var(--playlist-bg); border-bottom: 1px solid var(--bevel-lo); color: var(--green-on); font-family: "Lucida Console", Monaco, monospace; }
@@ -271,16 +272,15 @@ const styles = `
     @media (max-width: 520px) {
         :root { --btn-size: 44px; --btn-primary-size: 56px; }
         .btn.compact { width: 30px; height: 30px; }
-        .btn.shuffle { width: var(--btn-size); height: var(--btn-size); } /* Keep shuffle size consistent */
+        .btn.shuffle { width: var(--btn-size); height: var(--btn-size); }
         .transport-card .btn { width: 44px; height: 44px; }
         .transport-card .btn.primary { width: 56px; height: 56px; }
         :root { --q-actions-w: 88px; --q-action-btn: 28px; }
         .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; }
-        /* Cover size adjustment only needed for mobile portrait */
-        /* .cover-card .cover { width: 240px; height: 240px; } */
+        /* Cover size adjustment specific to mobile portrait moved to 900px query */
     }
 
-    /* --- MOBILE PHONE STYLES (< 900px) --- */
+    /* --- MOBILE PHONE STYLES (< 900px) --- MODIFIED BLOCK --- */
     @media (max-width: 900px) {
       /* Override body centering and padding for mobile */
       html, body {
@@ -292,6 +292,7 @@ const styles = `
 
       /* Make player shell full screen and stack vertically */
       .player-shell {
+        /* Keep display: grid; */
         grid-template-columns: 1fr; /* Single column */
         grid-template-areas: /* Stack elements */
           "cover"
@@ -318,10 +319,10 @@ const styles = `
       .transport-card .controls { flex-direction: row; flex-wrap: wrap; justify-content: center; }
       /* Adjust cover size for mobile portrait */
       .cover-card .cover {
-        width: 280px; /* Or adjust as needed */
-        height: 280px; /* Or adjust as needed */
+        width: 280px; /* Specific mobile size */
+        height: 280px; /* Specific mobile size */
       }
-       /* Ensure side-card (queue container) can shrink and fill its grid area */
+      /* Ensure side-card (queue container) can shrink and fill its grid area */
       .side-card {
         min-height: 0; /* Allows shrinking */
         padding: 10px; /* Adjust padding for mobile */
@@ -329,15 +330,27 @@ const styles = `
       }
        /* Ensure the inner queue list scrolls correctly */
       .queue { /* Target the inner div containing the list */
-         flex: 1; /* Already set, but ensure it works with parent height */
-         overflow-y: auto; /* Already set */
+         flex: 1; /* Make it fill the side-card */
+         overflow-y: auto; /* Enable vertical scrolling */
          /* Add touch scrolling momentum */
          -webkit-overflow-scrolling: touch;
+         /* Explicitly set background, border, padding for this inner div */
+         background-color: var(--playlist-bg);
+         border: 1px solid var(--bevel-lo);
+         padding: 5px;
+      }
+       /* Ensure queue list itself is targetted for scrolling */
+      .queue-list {
+         /* These styles might not be needed if .queue handles scrolling */
+         /* flex: 1 1 auto; */
+         /* overflow-y: auto; */
+         padding-right: 0; /* Remove padding here if .queue handles it */
+         /* background: transparent; /* Let .queue handle background */
       }
     }
     /* --- END MOBILE PHONE STYLES --- */
 
-    /* Additional styles (unchanged) */
+    /* Additional styles (unchanged from original) */
     .progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; }
     .time { font-size: 12px; color: var(--text-gray); }
     .seek { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: var(--bevel-lo); border-radius: 4px; outline: none; }
@@ -345,7 +358,7 @@ const styles = `
     .vol { margin-top: 10px; width: 100%; }
     .vol-row { display: flex; align-items: center; gap: 8px; }
     input[type="range"] { flex: 1; }
-    /* .queue rule moved inside mobile media query for clarity */
+    /* .queue rule is now defined inside the mobile media query */
     .search-box { margin-top: 10px; }
     .search-box input { width: 100%; padding: 8px; background: var(--playlist-bg); border: 1px solid var(--bevel-lo); color: var(--green-on); }
     .search-results { max-height: 200px; overflow-y: auto; background: #080808; border: 1px solid var(--bevel-lo); }
@@ -386,9 +399,10 @@ const initialState = {
 function JukeboxQueueItem({ song, index, currentIndex, onAction }) {
     const isCurrent = index === currentIndex;
 
+    // Use compact buttons from your original code
     return (
         <div
-            className={`qitem${isCurrent ? ' current' : ''}`}
+            className={`qitem${isCurrent ? ' current' : ''}`} // Use 'current' class if preferred
             data-index={index}
         >
             <div className="idx">{index + 1}</div>
@@ -397,12 +411,14 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction }) {
                 <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
             </div>
             <div className="qi-actions">
-                <button title="Play here" className="btn compact" onClick={() => onAction('play', index)}>▶️</button> {/* Added compact class */}
-                <button title="Remove" className="btn compact" onClick={() => onAction('remove', index)}>✖️</button> {/* Added compact class */}
+                {/* Ensure compact class is used for smaller buttons */}
+                <button title="Play here" className="btn compact" onClick={() => onAction('play', index)}>▶️</button>
+                <button title="Remove" className="btn compact" onClick={() => onAction('remove', index)}>✖️</button>
             </div>
         </div>
     );
 }
+
 
 export default function App() {
     const [state, setState] = useState(initialState);
@@ -417,12 +433,18 @@ export default function App() {
     const stateRef = useRef(state);
     const prevIndexRef = useRef(state.currentIndex);
     const nowPlayingIdRef = useRef(null); // Ref to track the current "Now Playing" song ID
+    const statusTextRef = useRef(statusText); // Ref for status text timeout checks
+    const volumeTimeoutRef = useRef(null); // Ref for debouncing volume
+    const searchTimeoutRef = useRef(null); // Ref for search debounce
 
     useEffect(() => { stateRef.current = state; }, [state]);
+    useEffect(() => { statusTextRef.current = statusText; }, [statusText]); // Keep ref updated
+
 
     useEffect(() => {
         const fontLink = document.createElement('link');
-        fontLink.href = 'https://fonts.googleapis.com/css2?family=Spinnaker&display=swap'; // Typo corrected: https:
+        // Corrected URL from previous potential typo
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=Spinnaker&display=swap';
         fontLink.rel = 'stylesheet';
         document.head.appendChild(fontLink);
         return () => { document.head.removeChild(fontLink); };
@@ -461,66 +483,45 @@ export default function App() {
                                 playbackRate: validRate,
                                 position: validPosition
                             });
+                        } else {
+                             navigator.mediaSession.setPositionState(null); // Clear if invalid
                         }
                     }
                 } catch (posError) {
                     console.warn('setPositionState failed:', posError.message);
+                     try { navigator.mediaSession.setPositionState(null); } catch (e) {} // Attempt to clear on error
                 }
             } catch (error) {
                 console.error('Media Session API error:', error);
+                 navigator.mediaSession.metadata = null; // Clear metadata on error
+                 navigator.mediaSession.playbackState = 'none';
             }
+        } else if ('mediaSession' in navigator) {
+             // Clear media session if no track
+             navigator.mediaSession.metadata = null;
+             navigator.mediaSession.playbackState = 'none';
+             try {
+                if ('setPositionState' in navigator.mediaSession) {
+                    navigator.mediaSession.setPositionState(null);
+                }
+             } catch (e) {}
         }
-    }, []);
+    }, []); // Removed coverArtUrl from dependencies, it's stable
 
-    const setupMediaSessionHandlers = useCallback((handleTransport, skipTo) => { // Added skipTo dependency
-        if ('mediaSession' in navigator) {
-            try {
-                navigator.mediaSession.setActionHandler('play', () => handleTransport('play-pause'));
-                navigator.mediaSession.setActionHandler('pause', () => handleTransport('play-pause'));
-                navigator.mediaSession.setActionHandler('previoustrack', () => handleTransport('previous'));
-                navigator.mediaSession.setActionHandler('nexttrack', () => handleTransport('next'));
-                navigator.mediaSession.setActionHandler('stop', () => handleTransport('stop'));
-
-                try {
-                    navigator.mediaSession.setActionHandler('seekto', (details) => {
-                        if (details.seekTime !== undefined) {
-                            const currentState = stateRef.current;
-                            skipTo(currentState.currentIndex, details.seekTime);
-                        }
-                    });
-                } catch (e) { console.warn("Seekto handler not supported", e)} // Added logging
-
-                try {
-                    navigator.mediaSession.setActionHandler('seekbackward', (details) => { // Added details param
-                        const currentState = stateRef.current;
-                        const seekOffset = details.seekOffset || 10; // Use provided offset or default
-                        const newPos = Math.max(0, currentState.position - seekOffset);
-                        skipTo(currentState.currentIndex, newPos);
-                    });
-                } catch (e) { console.warn("Seekbackward handler not supported", e)} // Added logging
-
-                try {
-                    navigator.mediaSession.setActionHandler('seekforward', (details) => { // Added details param
-                        const currentState = stateRef.current;
-                        const track = currentState.playlist[currentState.currentIndex];
-                        const maxPos = track?.duration || 0;
-                         const seekOffset = details.seekOffset || 10; // Use provided offset or default
-                        const newPos = Math.min(maxPos, currentState.position + seekOffset);
-                        skipTo(currentState.currentIndex, newPos);
-                    });
-                } catch (e) { console.warn("Seekforward handler not supported", e)} // Added logging
-            } catch (error) {
-                console.error('Error setting up Media Session handlers:', error);
-            }
-        }
-    }, []); // Removed skipTo from dependencies here, handleTransport uses it via closure
 
     // --- Core State Refresh Logic ---
     const refreshState = useCallback(async (forceUpdate = false) => {
-        if (!isSessionValid()) return; // Added check
+        if (!isSessionValid()) return; // Check auth early
+        // Prevent concurrent refreshes unless forced
         if (!forceUpdate && commandInProgress.current) {
+            // Optional: Log skipped refresh for debugging
+            // if (DEBUG()) console.log("Skipping refresh, command in progress.");
             return;
         }
+
+        // Indicate potential refresh activity
+        // Consider setting commandInProgress here if refreshes are slow
+        // commandInProgress.current = true;
 
         try {
             const result = await callJukebox('get');
@@ -531,404 +532,454 @@ export default function App() {
                 : (playlist?.entry ? [playlist.entry] : []);
 
             setState(prevState => {
-                const currentTrack = newPlaylist[status.currentIndex ?? 0]; // Used nullish coalescing
+                const currentTrack = newPlaylist[status.currentIndex ?? 0];
                 const prevTrack = prevState.playlist[prevState.currentIndex];
 
-                // --- SCROBBLE ID RESET LOGIC ---
-                // Reset scrobbled state only if the track ID actually changes
-                let newScrobbledIds = prevState.scrobbledIds; // Use existing state by default
-                if (currentTrack?.id && prevTrack?.id !== currentTrack?.id) {
-                    if (DEBUG()) console.log(`Track changed from ${prevTrack?.id} to ${currentTrack?.id}, resetting scrobble state.`);
-                   // Intentionally NOT resetting scrobbledIds here, polling loop handles it
-                }
-                 // Reset endHandledForId only if the track ID changes
+                 // Reset endHandledForId only if the track ID actually changes
                 const newEndHandledForId = currentTrack?.id !== prevTrack?.id ? null : prevState.endHandledForId;
+
+                // Important: Update localTickStart *only* from authoritative server position
+                const serverPosition = status.position ?? 0;
 
                 return {
                     ...prevState,
                     playing: status.playing,
-                    currentIndex: status.currentIndex ?? 0, // Used nullish coalescing
-                    position: status.position ?? 0, // Used nullish coalescing
-                    gain: status.gain ?? 1, // Used nullish coalescing
+                    currentIndex: status.currentIndex ?? 0,
+                    position: serverPosition, // Use server position directly
+                    gain: status.gain ?? 1,
                     playlist: newPlaylist,
-                    lastStatusTs: Date.now(),
-                    localTickStart: status.position ?? 0, // Used nullish coalescing
+                    lastStatusTs: Date.now(), // Timestamp of this *successful* refresh
+                    localTickStart: serverPosition, // Base ticker on this server position
                     endHandledForId: newEndHandledForId,
-                    // scrobbledIds: newScrobbledIds // Update scrobbledIds state
+                    // Note: Scrobbled status is managed separately via setScrobbledIds
                 };
             });
 
-            setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
+             // Update status text only if it's not showing a temporary message
+             if (!statusTextRef.current.startsWith(' L ') && !statusTextRef.current.startsWith('🎲') && !statusTextRef.current.startsWith('🔀') && !statusTextRef.current.startsWith('✅') && !statusTextRef.current.startsWith('❌') && !statusTextRef.current.startsWith('🔍') && !statusTextRef.current.startsWith('➕')) {
+                setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
+             }
+
         } catch (e) {
             if (e.message === 'Authentication failed' || e.message === 'Not authenticated') {
                 setIsAuthenticated(false);
-                setStatusText('Session expired. Please log in again.');
-                 clearSession(); // Ensure session is fully cleared
+                setStatusText('Session expired. Please log in.');
+                clearSession(); // Ensure session is fully cleared
             } else {
-                setStatusText(`Error: ${e.message}`);
+                 // Avoid overwriting specific error messages with generic refresh error
+                 if (!statusTextRef.current.startsWith('❌') && !statusTextRef.current.startsWith('⚠️')) {
+                    setStatusText(`Error refreshing: ${e.message}`);
+                 }
             }
             console.error('Refresh failed:', e);
+        } finally {
+            // commandInProgress.current = false; // Release lock if set
         }
-    }, [/* Removed scrobbledIds dependency */]); // Removed dependency
+    }, [/* No dependencies needed if functions called within are stable */]);
 
+     // skipTo depends on refreshState
      const skipTo = useCallback(async (index, offsetSec = 0) => {
-        if (!isSessionValid()) return; // Added check
+        if (!isSessionValid()) return;
         const currentState = stateRef.current;
-        // Ensure index is within bounds, considering potentially empty playlist
         index = Math.max(0, Math.min(index, Math.max(0, currentState.playlist.length - 1)));
 
         commandInProgress.current = true;
-        setStatusText('Skipping...'); // Provide user feedback
+        setStatusText('Skipping...');
         try {
             await callJukebox('skip', `&index=${index}&offset=${Math.max(0, Math.floor(offsetSec))}`);
-             // Immediately update local state for responsiveness before full refresh
+            // --- State Updates After Successful Skip ---
+             // 1. Immediately update local state for responsiveness
             setState(prev => ({
                 ...prev,
                 currentIndex: index,
-                position: offsetSec,
-                localTickStart: offsetSec, // Reset ticker base
-                lastStatusTs: Date.now(), // Reset ticker base time
-                endHandledForId: null, // Reset end handling on skip
-             }));
-            await refreshState(true); // Force refresh to get authoritative state
+                position: offsetSec, // Assume skip was successful
+                localTickStart: offsetSec,
+                lastStatusTs: Date.now(),
+                endHandledForId: null, // Reset end detection
+                seeking: false // Ensure seeking is false after skip
+            }));
+             // 2. Clear scrobble status for the *new* track
+             const newTrack = currentState.playlist[index];
+             if (newTrack) {
+                setScrobbledIds(prev => {
+                    const newSet = new Set(prev);
+                    // This logic assumes we want to allow re-scrobbling if the user explicitly skips back and replays.
+                    // If a track should *never* be scrobbled twice in a session, remove this delete.
+                    // newSet.delete(newTrack.id); // Optional: Allow re-scrobbling
+                    return newSet;
+                });
+                nowPlayingIdRef.current = newTrack.id; // Update now playing ref
+                scrobble(newTrack.id, false); // Send "now playing" update
+             } else {
+                 nowPlayingIdRef.current = null;
+             }
+             // 3. Trigger a forced refresh shortly after to confirm server state (optional but safer)
+             // setTimeout(() => refreshState(true), 150);
+             setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused'); // Update status
+
         } catch (e) {
-             console.error('Skip failed:', e); // Log error specifically
-             setStatusText(`Skip Error: ${e.message}`); // Show skip error
-             // Consider attempting a refresh even on error to try and recover state
-             await refreshState(true);
+             console.error('Skip failed:', e);
+             setStatusText(`❌ Skip Error: ${e.message}`);
+             await refreshState(true); // Attempt to recover state
         } finally {
             commandInProgress.current = false;
         }
-    }, [refreshState]); // Keep refreshState dependency
+    }, [refreshState]); // Keep dependency
 
 
+    // handleTransport depends on skipTo and refreshState
     const handleTransport = useCallback(async (action) => {
-        if (!isSessionValid() && action !== 'addRandom') return; // Allow addRandom even if logged out initially
+        if (!isSessionValid() && !['play-pause', 'stop'].includes(action)) { // Allow play/stop attempts even if session might be slightly stale
+             // Allow addRandom to proceed, it checks auth internally
+             if (action !== 'addRandom') {
+                setStatusText("⚠️ Please log in first.");
+                return;
+             }
+        }
+
 
         const currentState = stateRef.current;
+         // Prevent actions if playlist is empty (except addRandom)
+        if (currentState.playlist.length === 0 && action !== 'addRandom' && action !== 'clear') {
+            setStatusText("Queue is empty.");
+            return;
+        }
+
+
         commandInProgress.current = true;
-        setStatusText('...'); // Indicate action in progress
+        // Avoid clearing important status messages immediately
+        if (!statusTextRef.current.startsWith('❌') && !statusTextRef.current.startsWith('⚠️') ) {
+             setStatusText('...'); // Indicate action
+        }
+
 
         try {
-            let needsRefresh = true; // Assume refresh is needed unless action handles it
+            let needsFinalRefresh = true; // Most actions require a final state check
+
 
             if (action === 'play-pause') {
                 const cmd = currentState.playing ? 'stop' : 'start';
                 await callJukebox(cmd);
-                 // Optimistic UI update
-                 setState(prev => ({ ...prev, playing: !prev.playing }));
-                 setStatusText(!currentState.playing ? '▶️ Playing' : '⏸️ Paused'); // Update status immediately
-                 needsRefresh = false; // Let polling handle the exact state sync
-                 // Scrobble Now Playing immediately on play
-                 if (!currentState.playing && currentState.playlist[currentState.currentIndex]) {
-                      scrobble(currentState.playlist[currentState.currentIndex].id, false);
-                      nowPlayingIdRef.current = currentState.playlist[currentState.currentIndex].id;
-                 } else {
-                     nowPlayingIdRef.current = null; // Clear now playing on pause/stop
-                 }
+                const isNowPlaying = !currentState.playing;
+                // Optimistic UI update
+                setState(prev => ({ ...prev, playing: isNowPlaying }));
+                setStatusText(isNowPlaying ? '▶️ Playing' : '⏸️ Paused');
+                needsFinalRefresh = false; // Rely on polling
+
+                // Scrobble Now Playing / Clear ref
+                const track = currentState.playlist[currentState.currentIndex];
+                if (isNowPlaying && track) {
+                    scrobble(track.id, false);
+                    nowPlayingIdRef.current = track.id;
+                } else {
+                    nowPlayingIdRef.current = null;
+                }
+
             } else if (action === 'next') {
-                // Handle skipping past the end of the playlist
                 const nextIndex = currentState.currentIndex + 1;
-                 if (nextIndex >= currentState.playlist.length) {
-                     // Option 1: Stop playback (or loop based on repeat mode later)
+                if (nextIndex >= currentState.playlist.length && stateRef.current.repeatMode !== 'all') { // Check repeat mode
                      await callJukebox('stop');
-                     setState(prev => ({ ...prev, playing: false, position: 0 })); // Reset state
+                     setState(prev => ({ ...prev, playing: false, position: 0 }));
                      setStatusText('⏹️ End of Queue');
-                     needsRefresh = false;
-                     // Option 2: Wrap around (implement based on repeat mode)
-                     // await skipTo(0, 0); // Requires skipTo to be passed or accessible
-                 } else {
-                    await skipTo(nextIndex, 0); // Use skipTo for consistency
-                 }
-                 needsRefresh = false; // skipTo handles its own refresh
+                     needsFinalRefresh = false;
+                     nowPlayingIdRef.current = null;
+                } else {
+                     // Wrap around if repeating all, otherwise skipTo handles bounds
+                     const targetIndex = (stateRef.current.repeatMode === 'all' && nextIndex >= currentState.playlist.length) ? 0 : nextIndex;
+                    await skipTo(targetIndex, 0);
+                     needsFinalRefresh = false; // skipTo handles refresh/state
+                }
             } else if (action === 'previous') {
-                const restartThreshold = 3; // Seconds to consider restarting vs going back
+                const restartThreshold = 3;
                 const restart = currentState.position > restartThreshold;
                 let targetIndex = currentState.currentIndex;
                 if (!restart) {
-                    targetIndex = Math.max(0, currentState.currentIndex - 1);
+                    targetIndex = currentState.currentIndex - 1;
+                     // Handle wrapping around if repeating all
+                    if (targetIndex < 0 && stateRef.current.repeatMode === 'all') {
+                        targetIndex = Math.max(0, currentState.playlist.length - 1); // Go to last track
+                    }
+                    targetIndex = Math.max(0, targetIndex); // Ensure not less than 0 otherwise
                 }
-                 await skipTo(targetIndex, 0); // Use skipTo, always seek to 0 on previous/restart
-                 needsRefresh = false; // skipTo handles its own refresh
+                await skipTo(targetIndex, 0);
+                needsFinalRefresh = false; // skipTo handles refresh/state
             } else if (action === 'clear') {
-                if (window.confirm('Clear the whole queue?')) { // Use window.confirm
-                     await callJukebox('clear');
-                     // Clear local state immediately
-                     setState(prev => ({
-                         ...initialState, // Reset most state
-                         gain: prev.gain, // Keep volume
-                         // Keep auth details if needed, or handle logout separately
-                     }));
-                     setStatusText('Queue Cleared');
+                if (window.confirm('Clear the whole queue?')) {
+                    await callJukebox('clear');
+                    setState(prev => ({ // Reset state more completely
+                        ...initialState,
+                        gain: prev.gain, // Keep volume
+                        // Keep auth details from config ref if needed
+                        serverUrl: config.serverUrl,
+                        username: config.username,
+                        token: config.token,
+                        salt: config.salt,
+                    }));
+                    setIsAuthenticated(isSessionValid()); // Re-check auth state
+                    setStatusText('Queue Cleared');
+                    nowPlayingIdRef.current = null;
+                    updateMediaSession(null, 0, false); // Clear media session
                 } else {
-                    needsRefresh = false; // No action taken
-                     commandInProgress.current = false; // Release lock early
-                     return; // Exit early
+                    needsFinalRefresh = false;
+                    commandInProgress.current = false;
+                    return;
                 }
             } else if (action === 'shuffle') {
-                await callJukebox('shuffle');
-                setStatusText('🔀 Shuffled');
+                if (currentState.playlist.length > 1) { // Only shuffle if there's >1 song
+                     await callJukebox('shuffle');
+                     setStatusText('🔀 Shuffled');
+                 } else {
+                     setStatusText('Not enough tracks to shuffle.');
+                     needsFinalRefresh = false;
+                 }
             } else if (action === 'stop') {
                 await callJukebox('stop');
-                 // Optimistic UI update
-                setState(prev => ({ ...prev, playing: false, position: 0 })); // Reset position on stop
+                setState(prev => ({ ...prev, playing: false, position: 0 }));
                 setStatusText('⏹️ Stopped');
-                needsRefresh = false; // Let polling handle state sync
-                 nowPlayingIdRef.current = null; // Clear now playing
+                needsFinalRefresh = false;
+                nowPlayingIdRef.current = null;
+                 updateMediaSession(currentState.playlist[currentState.currentIndex], 0, false); // Update media session
             } else if (action === 'addRandom') {
-                if (!isSessionValid()) {
-                     setStatusText("Please log in to add songs.");
-                     needsRefresh = false;
+                 if (!isSessionValid()) { // Re-check auth just before API call
+                     setStatusText("⚠️ Please log in to add songs.");
+                     needsFinalRefresh = false;
                      commandInProgress.current = false;
                      return;
                  }
                 setStatusText('🎲 Adding random...');
-                const { randomSong } = await addRandomSong();
-                setStatusText(`🎲 Added: ${randomSong.title}`);
-                // Only auto-start if nothing was playing and queue was empty *before adding*
-                if (!currentState.playing && currentState.playlist.length === 0) {
-                     // Check state *after* adding
-                    const newState = await callJukebox('get'); // Get updated state
-                    if (newState.playlist?.entry?.length > 0 && !newState.status.playing) {
-                         await callJukebox('start');
-                         // Fetch final state after starting
-                         await refreshState(true);
-                         needsRefresh = false; // refreshState was called
-                    }
+                const { randomSong } = await addRandomSong(); // API call might throw
+                const stateBeforeAdd = stateRef.current; // Capture state before potential start
+                 // Refresh *after* adding to get the updated playlist
+                 await refreshState(true);
+                 const stateAfterAdd = stateRef.current; // Get the truly updated state
+
+                 setStatusText(`🎲 Added: ${randomSong.title}`);
+
+                // Check if playback should start based on state *before* adding
+                if (!stateBeforeAdd.playing && stateBeforeAdd.playlist.length === 0 && stateAfterAdd.playlist.length > 0) {
+                     // Playlist was empty and wasn't playing, now has a song. Start playback.
+                     await callJukebox('start');
+                     // Refresh again after starting to get final playing state and position
+                     await refreshState(true);
+                     needsFinalRefresh = false; // Final state confirmed
+                 } else {
+                     needsFinalRefresh = false; // State already refreshed after add
                  }
             }
 
-            if (needsRefresh) {
-                await refreshState(true); // Force refresh for actions that modify state
-                 // Update status text based on refreshed state only if not set above
-                 // Example: setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+            if (needsFinalRefresh) {
+                await refreshState(true);
             }
         } catch (e) {
-            setStatusText(`Action failed: ${e.message}`);
+            setStatusText(`❌ Action failed: ${e.message}`);
             console.error('Transport action failed:', e);
-             // Attempt to refresh state even after failure
-             try { await refreshState(true); } catch (refreshError) { console.error("Refresh after action failure also failed:", refreshError); }
+            try { await refreshState(true); } catch (refreshError) { console.error("Refresh after action failure also failed:", refreshError); }
         } finally {
             commandInProgress.current = false;
-             // Set a timeout to clear temporary status messages like 'Added...'
+            // Clear temporary status messages after delay
              setTimeout(() => {
-                 const currentStatus = statusTextRef.current; // Need a ref for statusText
-                 if (currentStatus.startsWith('🎲') || currentStatus.startsWith('🔀') || currentStatus.startsWith('Skipping') || currentStatus.startsWith('⏹️')) {
+                 const currentStatus = statusTextRef.current;
+                 if (currentStatus.startsWith('🎲') || currentStatus.startsWith('🔀') || currentStatus.startsWith('⏹️') || currentStatus === 'Queue Cleared' || currentStatus.startsWith('Not enough')) {
                      setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
                  }
-             }, 2000);
+             }, 2500); // Increased delay
         }
-    }, [refreshState, skipTo]); // Added skipTo
+    }, [refreshState, skipTo]);
 
 
-     // Need a ref for status text to use in setTimeout cleanup
-     const statusTextRef = useRef(statusText);
-     useEffect(() => {
-         statusTextRef.current = statusText;
-     }, [statusText]);
-
-
+    // handleQueueAction depends on skipTo, refreshState
     const handleQueueAction = useCallback(async (action, index) => {
         if (!isSessionValid()) return;
         commandInProgress.current = true;
         setStatusText('...');
         try {
             if (action === 'play') {
-                await skipTo(index, 0); // Use skipTo
+                await skipTo(index, 0);
             } else if (action === 'remove') {
-                const trackToRemove = stateRef.current.playlist[index];
-                if (!trackToRemove) return; // Index out of bounds
+                const currentState = stateRef.current; // Get state *before* removal
+                const trackToRemove = currentState.playlist[index];
+                if (!trackToRemove) return;
 
                 await callJukebox('remove', `&index=${index}`);
-                 setStatusText(`Removed: ${trackToRemove.title}`);
+                setStatusText(`🗑️ Removed: ${trackToRemove.title}`);
 
-                // --- ADJUSTMENT LOGIC ---
-                const currentState = stateRef.current;
-                let needsStateCorrection = false;
-                let newIndex = currentState.currentIndex;
-
-                // Scenario 1: Removed the currently playing track
-                if (index === currentState.currentIndex) {
-                    needsStateCorrection = true;
-                    // If it wasn't the last track, the server usually auto-plays the next (now at the same index)
-                    // If it WAS the last track, playback might stop, or index might become invalid.
-                    // We rely on refreshState to get the *actual* new index and playing state.
-                    if (DEBUG()) console.log("Removed currently playing track.");
-
-                // Scenario 2: Removed a track before the currently playing track
-                } else if (index < currentState.currentIndex) {
-                    needsStateCorrection = true;
-                    newIndex = currentState.currentIndex - 1; // Adjust index locally
-                    if (DEBUG()) console.log("Removed track before current. Adjusted index locally to:", newIndex);
+                // --- State Correction Logic ---
+                let optimisticIndex = currentState.currentIndex;
+                // If removed track was before current, adjust optimistic index
+                if (index < currentState.currentIndex) {
+                    optimisticIndex = currentState.currentIndex - 1;
                 }
+                // If removed track *was* current, next track (if any) will be at the *same* index after removal.
+                // No change needed for optimisticIndex in this case, refresh will confirm.
 
-                // Optimistic UI update (remove item locally)
+                // Optimistic UI update
                 setState(prev => ({
                     ...prev,
                     playlist: prev.playlist.filter((_, i) => i !== index),
-                    currentIndex: needsStateCorrection ? newIndex : prev.currentIndex // Apply local index correction
+                    currentIndex: optimisticIndex // Apply optimistic correction
                 }));
 
-                await refreshState(true); // Force refresh to get authoritative server state
+                // Force refresh to get the definite state from the server
+                await refreshState(true);
+
+                 // Special case: If removing the *last* item, ensure state is clean
+                if (currentState.playlist.length === 1 && index === 0) {
+                    setState(prev => ({ ...prev, playing: false, position: 0, currentIndex: 0 })); // Reset playback state
+                    nowPlayingIdRef.current = null;
+                     updateMediaSession(null, 0, false);
+                }
+
             }
         } catch(e) {
             console.error('Queue action failed:', e);
-            setStatusText(`Error: ${e.message}`);
-             await refreshState(true); // Attempt refresh even on error
+            setStatusText(`❌ Error: ${e.message}`);
+            await refreshState(true); // Attempt refresh even on error
         } finally {
             commandInProgress.current = false;
-             setTimeout(() => {
-                 if (statusTextRef.current.startsWith('Removed:')) {
-                    setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
-                 }
-             }, 2000);
+            setTimeout(() => {
+                if (statusTextRef.current.startsWith('🗑️ Removed:')) {
+                   setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+                }
+            }, 2000);
         }
     }, [skipTo, refreshState]);
 
+
     // --- Effects & Listeners ---
 
+     // Setup media session handlers
      useEffect(() => {
         // Pass skipTo to the handler setup
         setupMediaSessionHandlers(handleTransport, skipTo);
-    }, [setupMediaSessionHandlers, handleTransport, skipTo]); // Added skipTo
+    }, [setupMediaSessionHandlers, handleTransport, skipTo]);
 
+    // Update media session metadata when track/state changes
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
-        if (currentTrack) {
-            updateMediaSession(currentTrack, state.position, state.playing);
-        } else {
-             // Clear media session if playlist is empty or index is invalid
-             if ('mediaSession' in navigator) {
-                 navigator.mediaSession.metadata = null;
-                 navigator.mediaSession.playbackState = 'none';
-                 try {
-                    if ('setPositionState' in navigator.mediaSession) {
-                        navigator.mediaSession.setPositionState(null);
-                    }
-                 } catch (e) {}
-             }
-        }
+        updateMediaSession(currentTrack, state.position, state.playing);
     }, [state.currentIndex, state.playlist, state.position, state.playing, updateMediaSession]);
 
-    // Initialization - try to reconnect with saved credentials
+
+    // Initialization effect (runs once on mount)
     useEffect(() => {
         let mounted = true;
 
-        async function init() { // Renamed for clarity
+        async function init() {
             try {
                 const savedConfig = getConfig();
-                if (savedConfig.username && savedConfig.serverUrl) { // Check serverUrl too
-                    setConfigForm(prev => ({...prev, ...savedConfig, password: '' })); // Keep password empty
+                // Check for essential config items
+                if (savedConfig.username && savedConfig.serverUrl) {
+                    setConfigForm(prev => ({...prev, ...savedConfig, password: '' }));
                     setStatusText('🔌 Reconnecting…');
-
                     const connected = await reconnect();
 
-                    if (!mounted) return;
+                    if (!mounted) return; // Check mount status after async call
 
                     if (connected) {
                         setIsAuthenticated(true);
-                        setStatusText('✅ Connected. Refreshing...');
-                        await refreshState(true); // Force initial refresh
+                        setStatusText('✅ Refreshing...');
+                        await refreshState(true); // Initial state load
 
                         // Check state *after* refresh
-                        const currentState = stateRef.current;
+                        const currentState = stateRef.current; // Use ref for latest state
                         if (currentState.playlist.length === 0) {
-                             setStatusText(' Queue empty. Adding random songs...');
-                             // Add songs sequentially to avoid race conditions
+                             setStatusText('Queue empty. Adding random...');
                              try {
-                                 await handleTransport('addRandom');
-                                 // Add more if desired, maybe with small delays
-                                 // await new Promise(resolve => setTimeout(resolve, 200));
-                                 // await handleTransport('addRandom');
+                                 await handleTransport('addRandom'); // Add one song
+                                 // No need for more refreshes here, addRandom handles it
                              } catch (addError) {
-                                 console.error("Error adding initial random songs:", addError);
-                                 setStatusText("Error adding initial songs.");
+                                 console.error("Error adding initial random song:", addError);
+                                 setStatusText("❌ Error adding initial song.");
                              }
                         } else {
+                             // Set status based on the loaded state
                              setStatusText(currentState.playing ? '▶️ Playing' : '⏸️ Paused');
                         }
                     } else {
+                        // Reconnect failed
                         setIsAuthenticated(false);
                         setStatusText('⚠️ Reconnect failed. Please log in.');
-                        clearSession(); // Ensure cleanup
+                        clearSession();
                     }
                 } else {
+                    // No valid config saved
                     setStatusText('👋 Please log in');
                 }
             } catch (e) {
-                console.error("Initialization error:", e); // Log error
+                console.error("Initialization error:", e);
                 if (mounted) {
                     setIsAuthenticated(false);
-                    setStatusText('Login Required'); // Simpler message
-                    clearSession(); // Ensure cleanup
+                    setStatusText('❌ Init Error. Please login.');
+                    clearSession();
                 }
             }
         }
 
-        init(); // Call the async function
+        init();
 
         return () => { mounted = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Removed refreshState dependency, init should run once
+    }, []); // Empty dependency array ensures this runs only once
 
 
-    // Polling loop (and authoritative scrobble check)
+    // Polling effect
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated) return; // Stop if not authenticated
 
-        let pollTimeoutId = null; // Use timeout for variable interval
+        let pollTimeoutId = null;
 
          const poll = async () => {
-             if (!isSessionValid()) { // Check auth before fetching
-                setIsAuthenticated(false); // Update auth state
+             if (!isSessionValid()) { // Double-check auth before fetching
+                setIsAuthenticated(false);
                 setStatusText("Session expired. Please log in.");
-                return; // Stop polling
+                clearTimeout(pollTimeoutId); // Stop polling
+                return;
              }
              try {
-                await refreshState(false); // Use the non-forcing refresh
+                // Use non-forcing refresh during polling
+                await refreshState(false);
 
                  // --- SCROBBLE LOGIC ---
-                 const currentState = stateRef.current; // Get latest state *after* refresh
+                 const currentState = stateRef.current;
                  const tr = currentState.playlist[currentState.currentIndex];
 
-                 if (tr) { // Only proceed if there's a current track
+                 if (tr) {
                      const dur = Math.max(0, tr.duration || 0);
-                     const pos = currentState.position; // Use authoritative position from refresh
+                     const pos = currentState.position;
 
-                      // Reset scrobble status if track has changed *since last poll*
-                     if (tr.id !== nowPlayingIdRef.current) {
-                          if (DEBUG()) console.log(`Polling detected track change to ${tr.id}, resetting scrobble status for this track.`);
-                          setScrobbledIds(prev => {
-                              const newSet = new Set(prev);
-                              // Keep track of scrobbled songs, but don't prevent scrobbling the *same song* if played again later.
-                              // The check `!scrobbledIds.has(tr.id)` handles this.
-                              return newSet;
-                          });
-                          // Update Now Playing via scrobble API if playing
-                          if (currentState.playing) {
-                              scrobble(tr.id, false);
-                          }
-                          nowPlayingIdRef.current = tr.id; // Update ref *after* potential scrobble call
+                     // Update Now Playing ref and API if track changed or started playing
+                     if (tr.id !== nowPlayingIdRef.current || (currentState.playing && !prevStateRef.current?.playing)) { // Use prevStateRef
+                         if (DEBUG()) console.log(`Polling: Track changed to ${tr.id} or playback started.`);
+                          // Reset scrobble status for *this instance* of the track
+                         setScrobbledIds(prev => {
+                             const newSet = new Set(prev);
+                             // Decide whether to allow re-scrobbling the same ID later
+                             // If not: newSet.delete(tr.id);
+                             return newSet;
+                         });
+                         if (currentState.playing) {
+                             scrobble(tr.id, false); // Update "Now Playing"
+                         }
+                         nowPlayingIdRef.current = tr.id;
+                     } else if (!currentState.playing && prevStateRef.current?.playing) {
+                         // Playback stopped, clear now playing ref
+                         nowPlayingIdRef.current = null;
                      }
 
 
-                     // Check eligibility and if *this instance* hasn't been scrobbled
+                     // Check scrobble eligibility
                      if (currentState.playing && dur > 30 && !scrobbledIds.has(tr.id)) {
                          const isHalfway = pos >= dur / 2;
-                         const isFourMinutes = pos >= 240; // 4 minutes
+                         const isFourMinutes = pos >= 240;
 
                          if (isHalfway || isFourMinutes) {
-                             if (DEBUG()) console.log(`Scrobbling (from poll): ${tr.title} (ID: ${tr.id})`);
-                             await scrobble(tr.id, true); // true for a full scrobble
+                             if (DEBUG()) console.log(`Scrobbling (poll): ${tr.title} (ID: ${tr.id})`);
+                             await scrobble(tr.id, true); // Full scrobble
 
-                             // Update scrobble state immediately after successful scrobble call
-                             setScrobbledIds(prev => new Set(prev).add(tr.id));
+                             setScrobbledIds(prev => new Set(prev).add(tr.id)); // Mark as scrobbled
 
-                             // Update status temporarily
-                              // statusTextRef check is handled in handleTransport cleanup
                              setStatusText(` L Scrobble Registered: ${tr.title}`);
                               setTimeout(() => {
-                                 // Only revert if the status hasn't changed to something else
                                  if (statusTextRef.current.startsWith(` L Scrobble Registered:`)) {
                                       setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
                                  }
@@ -936,90 +987,80 @@ export default function App() {
                          }
                      }
                  } else {
-                     // No track currently, ensure nowPlaying ref is cleared
-                     nowPlayingIdRef.current = null;
+                      // No current track
+                      nowPlayingIdRef.current = null;
                  }
+                 prevStateRef.current = currentState; // Update previous state ref *after* logic
 
 
              } catch (e) {
-                console.error("Background poll refresh failed:", e);
-                // Don't stop polling on transient errors, but log them
+                console.error("Poll refresh failed:", e);
+                // Continue polling on error
              } finally {
-                 // Schedule next poll - adjust interval based on visibility?
-                  const interval = document.hidden ? 10000 : 2000; // Longer interval when hidden
-                  if (isSessionValid()) { // Only reschedule if still valid
+                 // Schedule next poll
+                  const interval = document.hidden ? 10000 : 2500; // Adjusted intervals
+                  if (isSessionValid() && isAuthenticated) { // Check both
                     pollTimeoutId = setTimeout(poll, interval);
                   }
              }
          };
+         // Ref to store previous state for comparison in polling
+        const prevStateRef = useRef(stateRef.current);
 
-        // Start the first poll
-         pollTimeoutId = setTimeout(poll, 100); // Start polling shortly after auth
+
+        // Start polling after a short delay
+         pollTimeoutId = setTimeout(poll, 500);
 
 
-        return () => clearTimeout(pollTimeoutId); // Clear timeout on unmount/re-run
+        return () => clearTimeout(pollTimeoutId); // Cleanup on unmount or re-run
     }, [refreshState, isAuthenticated]); // Dependencies
 
 
-    // Auto-remove finished songs logic (Improved)
-    useEffect(() => {
-         // This effect now ONLY relies on the change of currentIndex provided by refreshState
-        const prevIndex = prevIndexRef.current; // Get the index *before* this render
-        const currentIndex = state.currentIndex; // Get the index *for* this render
+    // Auto-remove finished songs effect (Refined)
+     useEffect(() => {
+         const prevIndex = prevIndexRef.current;
+         const currentIndex = state.currentIndex;
 
-        // Check if the index has advanced.
-        if (currentIndex > prevIndex && state.playlist.length > 0) {
-             // Only auto-remove if not repeating the single track that just finished
-             const finishedTrackIndex = prevIndex; // The track that just finished IS prevIndex
-            const isRepeatingOne = state.repeatMode === 'one' && currentIndex === finishedTrackIndex; // Example check
+         // Check if index advanced (meaning a track likely finished)
+         if (currentIndex > prevIndex && state.playlist.length > 0) {
+             const finishedTrackIndex = prevIndex;
+             // Check repeat mode - simplified: assuming no repeat for now
+             // const isRepeatingOne = state.repeatMode === 'one';
+             // if (!isRepeatingOne) { ... }
 
-            if (!isRepeatingOne) {
-                (async () => {
-                    // This assumes the server *correctly* advanced the index.
-                    // We remove the track at prevIndex.
-                    const indexToRemove = prevIndex;
-                    const trackToRemove = state.playlist[indexToRemove]; // Get track info *before* potential removal
+             (async () => {
+                 const trackToRemove = state.playlist[finishedTrackIndex]; // Get data before potential removal
 
-                    if (trackToRemove && indexToRemove < currentIndex) { // Sanity check: ensure index is valid and behind current
-                         if (DEBUG()) console.log(`Auto-removing finished track at index ${indexToRemove}: ${trackToRemove.title}`);
-                        try {
-                            await callJukebox('remove', `&index=${indexToRemove}`);
-                             // OPTIONAL: Optimistic UI update (can cause flicker if refresh is slow)
-                             // setState(prev => ({
-                             //     ...prev,
-                             //     playlist: prev.playlist.filter((_, i) => i !== indexToRemove),
-                              //    currentIndex: prev.currentIndex - 1 // Adjust current index if needed
-                             // }));
-                             await refreshState(true); // Get definite state after removal
-                        } catch (e) {
-                            console.error(`Failed to auto-remove finished song at index ${indexToRemove}:`, e);
-                             await refreshState(true); // Refresh even on error
-                        }
-                     } else {
-                         if (DEBUG()) console.log(`Skipping auto-remove: Invalid index (${indexToRemove}) or track data.`);
+                 // Additional check: Ensure the finished index is still valid in the *current* playlist state
+                 // This helps prevent errors if the playlist changed rapidly between renders
+                 if (trackToRemove && finishedTrackIndex < state.playlist.length) {
+                     if (DEBUG()) console.log(`Auto-removing finished track @ ${finishedTrackIndex}: ${trackToRemove.title}`);
+                     try {
+                         await callJukebox('remove', `&index=${finishedTrackIndex}`);
+                          // No optimistic UI update here, rely solely on refreshState
+                          await refreshState(true); // Force refresh to get state *after* removal
+                     } catch (e) {
+                         console.error(`Failed to auto-remove @ ${finishedTrackIndex}:`, e);
+                          await refreshState(true); // Refresh even on error
                      }
-                })();
-            } else {
-                 if (DEBUG()) console.log("Skipping auto-remove due to repeat mode 'one'.");
-            }
-        }
+                 } else {
+                     if (DEBUG()) console.log(`Skipping auto-remove: Index ${finishedTrackIndex} seems invalid for current playlist.`);
+                 }
+             })();
+         }
 
-        // Always update the prevIndexRef *after* the logic for the *next* render cycle
-        prevIndexRef.current = currentIndex;
+         // Update prevIndexRef *after* logic for the next render
+         prevIndexRef.current = currentIndex;
 
-    }, [state.currentIndex, state.playlist, state.repeatMode, refreshState]); // Dependencies
-
-
-    // "Now Playing" update effect - Simplified: Handled within polling loop
+     }, [state.currentIndex, state.playlist, /* state.repeatMode, */ refreshState]); // Dependencies
 
 
-    // Position ticker (for UI visual update only) - Keep as is
+    // Position ticker effect
     useEffect(() => {
         let tickIntervalId = null;
 
          const tick = () => {
-             const currentState = stateRef.current; // Use ref for latest state
-             // Only tick if the tab is visible, playing, and not seeking
+             const currentState = stateRef.current;
              if (document.hidden || !currentState.playing || currentState.seeking) {
                  return;
              }
@@ -1027,125 +1068,98 @@ export default function App() {
              const tr = currentState.playlist[currentState.currentIndex];
              const dur = Math.max(0, tr?.duration || 0);
 
-             if (dur > 0) { // Only calculate if duration is known
-                 // Calculate visual-only position based on last *authoritative* time + local delta
+             if (dur > 0) {
                  const dt = (Date.now() - currentState.lastStatusTs) / 1000;
                  const estimatedPos = currentState.localTickStart + dt;
-                 const pos = Math.min(dur, Math.max(0, estimatedPos)); // Clamp position between 0 and duration
+                 const pos = Math.min(dur, Math.max(0, estimatedPos));
 
-                 // Only update state if the position actually changed visually
-                 if (Math.abs(pos - currentState.position) > 0.1) { // Threshold to avoid rapid updates
+                 // Update state only if visually changed
+                 if (Math.abs(pos - currentState.position) > 0.1) {
                      setState(prev => ({ ...prev, position: pos }));
                  }
 
-                 // Check for track end based on local ticker (less reliable than server)
-                 // This is primarily for immediate UI feedback before the server confirms the next track
-                 if (pos >= dur && dur > 0 && !currentState.endHandledForId) {
-                      if (DEBUG()) console.log(`Local ticker detected end for track ID: ${tr?.id}`);
-                      // Mark that local end is handled to prevent repeats before server state update
-                      setState(prev => ({ ...prev, endHandledForId: tr?.id }));
-                      // OPTIONAL: Trigger handleTransport('next') optimistically?
-                      // Be cautious: This might conflict with server-side auto-advance.
-                      // handleTransport('next');
+                 // Local end detection (less reliable, for UI feedback)
+                 if (pos >= dur && !currentState.endHandledForId && tr?.id) {
+                      if (DEBUG()) console.log(`Ticker detected end for ID: ${tr.id}`);
+                      setState(prev => ({ ...prev, endHandledForId: tr.id }));
+                      // Avoid auto-triggering 'next' here, let server/polling handle it
                  }
              }
          };
 
-         // Start ticking immediately if playing
+         // Clear existing interval before setting a new one
+        clearInterval(tickIntervalId);
         if (state.playing && !state.seeking) {
-           tickIntervalId = setInterval(tick, 500); // UI ticks every 500ms
+           tickIntervalId = setInterval(tick, 500);
         }
 
-
-        return () => clearInterval(tickIntervalId); // Clear interval on cleanup
-         // Rerun effect if playing state or seeking state changes
-    }, [state.playing, state.seeking]);
+        return () => clearInterval(tickIntervalId);
+    }, [state.playing, state.seeking]); // Rerun when playing or seeking changes
 
 
-    // Volume Change Handler
+    // Volume Change Handler (with debouncing)
     const handleVolumeChange = useCallback(async (e) => {
         if (!isSessionValid()) return;
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
 
-        // Optimistic UI update
-        setState(prev => ({ ...prev, gain }));
+        setState(prev => ({ ...prev, gain })); // Optimistic UI
 
-        // Debounce API call
-        // Clear previous timeout if exists
-        if (volumeTimeoutRef.current) {
-            clearTimeout(volumeTimeoutRef.current);
-        }
-        // Set new timeout
+        clearTimeout(volumeTimeoutRef.current);
         volumeTimeoutRef.current = setTimeout(async () => {
             try {
                 await callJukebox('setGain', `&gain=${gain}`);
-                 // Optional: Confirm with a refresh after a delay?
-                 // setTimeout(() => refreshState(true), 500);
             } catch (e) {
                 console.error('Set gain failed:', e);
-                setStatusText(`Volume Error: ${e.message}`);
-                // Revert UI? Or rely on next refresh?
-                 await refreshState(true); // Refresh to get actual gain
+                setStatusText(`❌ Volume Error: ${e.message}`);
+                await refreshState(true); // Revert UI on error
             }
-        }, 250); // Debounce time in ms
-
-    }, [refreshState]); // Added refreshState dependency
-
-     const volumeTimeoutRef = useRef(null); // Ref for debouncing volume
+        }, 250);
+    }, [refreshState]); // Dependency
 
 
-    // Seek Logic
+    // Seek Logic (Input vs Change)
     const handleSeekInput = useCallback((e) => {
-        // Update UI immediately while dragging
         const seekPercentage = Number(e.target.value) / 1000;
         const currentState = stateRef.current;
         const tr = currentState.playlist[currentState.currentIndex];
-        const dur = Math.max(0, tr?.duration || 0);
+        const dur = Math.max(1, tr?.duration || 1); // Avoid division by zero
         const pos = seekPercentage * dur;
 
-        setState(prev => ({
-            ...prev,
-            seeking: true, // Mark as seeking
-            position: pos, // Update visual position immediately
-        }));
+        setState(prev => ({ ...prev, seeking: true, position: pos }));
     }, []);
 
     const handleSeekChange = useCallback(async (e) => {
-        // Called when slider is released (mouse up)
         const seekPercentage = Number(e.target.value) / 1000;
         const currentState = stateRef.current;
         const tr = currentState.playlist[currentState.currentIndex];
-        const dur = Math.max(0, tr?.duration || 0);
+        const dur = Math.max(1, tr?.duration || 1);
         const pos = seekPercentage * dur;
 
-        setState(prev => ({ ...prev, seeking: false })); // Mark seeking as finished
-
+        // Keep seeking true until skipTo finishes? No, skipTo handles it.
+        // setState(prev => ({ ...prev, seeking: false })); // Let skipTo manage seeking state
         if (isSessionValid()) {
-            await skipTo(currentState.currentIndex, pos); // Call skipTo to update server
+             // Pass seeking: false hint to skipTo? Or let skipTo manage it.
+            await skipTo(currentState.currentIndex, pos);
+        } else {
+             setState(prev => ({ ...prev, seeking: false })); // Not logged in, just stop seeking locally
         }
     }, [skipTo]);
 
 
-    // Search Logic
-    const searchTimeoutRef = useRef(null); // Ref for search debounce
+    // Search Logic (with debounce)
     useEffect(() => {
         const q = searchQuery.trim();
-
-        // Clear previous timeout if query changes
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
+        clearTimeout(searchTimeoutRef.current); // Clear previous timeout
 
         if (q.length >= 2 && isSessionValid()) {
             searchTimeoutRef.current = setTimeout(async () => {
-                setStatusText(`🔍 Searching for "${q}"...`);
+                setStatusText(`🔍 Searching...`);
                 try {
                     const results = await searchSongs(q);
                     setSearchResults(results);
-                    setStatusText(results.length > 0 ? `🔍 Found ${results.length} results` : `🔍 No results for "${q}"`);
-                     // Clear status after a few seconds
-                     setTimeout(() => {
+                    setStatusText(results.length > 0 ? `🔍 ${results.length} results` : `🔍 No results`);
+                     setTimeout(() => { // Clear search status
                          if (statusTextRef.current.startsWith('🔍')) {
                              setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
                          }
@@ -1153,53 +1167,51 @@ export default function App() {
                 } catch (e) {
                     console.error('Search failed:', e);
                     setSearchResults([]);
-                    setStatusText(`Search Error: ${e.message}`);
+                    setStatusText(`❌ Search Error`);
                 }
-            }, 300); // Debounce search API calls
+            }, 350); // Slightly longer debounce
         } else {
-            setSearchResults([]); // Clear results if query is too short or not authenticated
+            setSearchResults([]); // Clear results immediately if query short/invalid
         }
 
-        // Cleanup function to clear timeout if component unmounts or query changes again
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
-    }, [searchQuery]); // Rerun only when searchQuery changes
+        return () => clearTimeout(searchTimeoutRef.current); // Cleanup
+    }, [searchQuery, isAuthenticated]); // Add isAuthenticated dependency
 
-    const addSongFromSearch = useCallback(async (song) => { // Pass whole song object
+
+    // Add Song from Search Results
+    const addSongFromSearch = useCallback(async (song) => {
         if (!isSessionValid()) return;
         commandInProgress.current = true;
         setStatusText(`➕ Adding: ${song.title}`);
-        setSearchQuery(''); // Clear search input immediately
-        setSearchResults([]); // Clear results immediately
+        setSearchQuery(''); // Clear search UI
+        setSearchResults([]);
 
         try {
-             const currentState = stateRef.current; // Get state *before* adding
+            const stateBeforeAdd = stateRef.current;
             await callJukebox('add', `&id=${encodeURIComponent(song.id)}`);
+            await refreshState(true); // Refresh *after* adding
+            const stateAfterAdd = stateRef.current;
+            setStatusText(`✅ Added: ${song.title}`);
 
-            // Only auto-start if nothing was playing and queue was empty *before adding*
-            if (!currentState.playing && currentState.playlist.length === 0) {
+            // Auto-start logic
+            if (!stateBeforeAdd.playing && stateBeforeAdd.playlist.length === 0 && stateAfterAdd.playlist.length > 0) {
                  await callJukebox('start');
-                 await refreshState(true); // Get final state after starting
-            } else {
-                 await refreshState(true); // Just refresh state if already playing or queue wasn't empty
+                 await refreshState(true); // Refresh *again* after starting
             }
-             setStatusText(`✅ Added: ${song.title}`);
         } catch (e) {
             console.error('Add song failed:', e);
-            setStatusText(`Error adding: ${e.message}`);
-             await refreshState(true); // Attempt refresh
+            setStatusText(`❌ Error adding`);
+            await refreshState(true); // Attempt refresh
         } finally {
             commandInProgress.current = false;
-             setTimeout(() => {
-                 if (statusTextRef.current.startsWith('✅ Added:') || statusTextRef.current.startsWith('Error adding:')) {
-                    setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
-                 }
-             }, 2000);
+            setTimeout(() => { // Clear add status
+                if (statusTextRef.current.startsWith('✅ Added:') || statusTextRef.current.startsWith('❌ Error adding')) {
+                   setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+                }
+            }, 2000);
         }
-    }, [refreshState]);
+    }, [refreshState]); // Dependency
+
 
     // Login Logic
     const handleConfigChange = useCallback((e) => {
@@ -1208,46 +1220,58 @@ export default function App() {
 
     const handleLogin = useCallback(async () => {
         const { serverUrl, username, password } = configForm;
-        if (!username || !password) { setStatusText('⚠️ Please enter username and password'); return; }
-        if (!serverUrl) { setStatusText('⚠️ Please enter Server URL'); return; } // Added check
+        if (!username || !password || !serverUrl) {
+            setStatusText('⚠️ URL, Username & Password required');
+            return;
+        }
 
         setStatusText('🔒 Logging in…');
-        setIsAuthenticated(false); // Assume failure initially
+        setIsAuthenticated(false);
         try {
-            await authenticate(serverUrl.trim(), username.trim(), password); // Trim inputs
-            // Auth successful
+            await authenticate(serverUrl.trim(), username.trim(), password);
             setIsAuthenticated(true);
-            setStatusText('✅ Login successful! Loading player…');
-            await refreshState(true); // Force refresh after login
+            setStatusText('✅ Login successful! Loading...');
+            await refreshState(true);
 
-             // Check state *after* refresh
-             const currentState = stateRef.current;
+            const currentState = stateRef.current;
             if (currentState.playlist.length === 0) {
-                 setStatusText('Queue empty. Adding random song...');
-                 await handleTransport('addRandom'); // Add one song
+                setStatusText('Queue empty. Adding random...');
+                await handleTransport('addRandom');
             } else {
-                 setStatusText(currentState.playing ? '▶️ Playing' : '⏸️ Paused');
+                setStatusText(currentState.playing ? '▶️ Playing' : '⏸️ Paused');
             }
-             setConfigForm(f => ({ ...f, password: '' })); // Clear password field
+            setConfigForm(f => ({ ...f, password: '' }));
         } catch (e) {
             setIsAuthenticated(false);
             setStatusText(`❌ Login failed: ${e.message}`);
             console.error('Login error:', e);
-             clearSession(); // Ensure cleanup on failure
+            clearSession();
         }
     }, [configForm, refreshState, handleTransport]);
+
+    // Logout Function
+     const handleLogout = useCallback(() => {
+         clearSession();
+         setIsAuthenticated(false);
+         setStatusText("Logged out.");
+         setState(initialState); // Reset player state completely
+         setSearchResults([]); // Clear search results
+         setSearchQuery(''); // Clear search query
+         nowPlayingIdRef.current = null; // Clear now playing ref
+         updateMediaSession(null, 0, false); // Clear media session
+     }, [updateMediaSession]); // Dependency
 
     // --- Derived State ---
     const currentTrack = state.playlist[state.currentIndex];
 
+    // seekValue for the slider position
     const seekValue = useMemo(() => {
-        const tr = currentTrack; // Use already derived currentTrack
-        const dur = Math.max(0, tr?.duration || 0);
-        // Use state.position which is updated by both ticker and refreshState
+        const tr = currentTrack;
+        const dur = Math.max(1, tr?.duration || 1); // Use duration > 0
         const pos = Math.max(0, Math.min(dur, state.position));
-        // Calculate percentage based on current position and duration
-        return dur > 0 ? Math.round((pos / dur) * 1000) : 0;
-    }, [state.position, currentTrack]); // Depend on position and track
+        return Math.round((pos / dur) * 1000); // Calculate percentage value 0-1000
+    }, [state.position, currentTrack]);
+
 
     // --- RENDER ---
     return (
@@ -1255,27 +1279,32 @@ export default function App() {
             <style>{styles}</style>
             <div className="player-shell">
                 <aside className="cover-card">
-                    <img className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 500)} /> {/* Slightly smaller size */}
+                    {/* Use a placeholder if no cover art */}
+                    <img
+                        className="cover"
+                        alt="Album art"
+                        src={coverArtUrl(currentTrack?.coverArt, 500) || 'placeholder.png'} // Add a placeholder image URL
+                        onError={(e) => { e.target.onerror = null; e.target.src='placeholder.png'; }} // Fallback on error
+                     />
                     <div className="meta">
-                        <div className="title">{currentTrack?.title || 'Nothing playing'}</div>
-                        <div className="artist">{currentTrack?.artist || '—'}</div>
-                        <div className="album">{currentTrack?.album || ''}&nbsp;</div> {/* Keep space for layout consistency */}
+                        <div className="title" style={{ minHeight: '1.2em' }}>{currentTrack?.title || (isAuthenticated ? 'Queue Empty' : 'Not Connected')}</div>
+                        <div className="artist" style={{ minHeight: '1.2em' }}>{currentTrack?.artist || '-'}</div>
+                        <div className="album" style={{ minHeight: '1.2em' }}>{currentTrack?.album || ''}&nbsp;</div>
                     </div>
                 </aside>
 
                 <div className="transport-card">
                      <div className="status-row">
-                        {/* Use a span for status text to prevent layout shifts */}
-                        <span id="statusText" style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '10px'}}>{statusText}</span>
+                        <span id="statusText" title={statusText} style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '10px'}}>{statusText}</span>
                         <div className="small">Queue: <span id="queueCount">{state.playlist.length}</span></div>
                     </div>
                     <div className="controls">
-                      <button className="btn" title="Previous" onClick={() => handleTransport('previous')} disabled={!isAuthenticated}>⏮</button>
-                      <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')} disabled={!isAuthenticated || state.playlist.length === 0}>
+                      <button className="btn" title="Previous" onClick={() => handleTransport('previous')} disabled={!isAuthenticated || state.playlist.length === 0}>⏮</button>
+                      <button className="btn primary" title={state.playing ? "Pause" : "Play"} onClick={() => handleTransport('play-pause')} disabled={!isAuthenticated || state.playlist.length === 0}>
                         {state.playing ? '⏸' : '▶'}
                       </button>
-                      <button className="btn" title="Next" onClick={() => handleTransport('next')} disabled={!isAuthenticated}>⏭</button>
-                      <button className="btn shuffle" title="Shuffle Playlist" onClick={() => handleTransport('shuffle')} disabled={!isAuthenticated}>🔀</button>
+                      <button className="btn" title="Next" onClick={() => handleTransport('next')} disabled={!isAuthenticated || state.playlist.length === 0}>⏭</button>
+                      <button className="btn shuffle" title="Shuffle Playlist" onClick={() => handleTransport('shuffle')} disabled={!isAuthenticated || state.playlist.length < 2}>🔀</button>
                       <button className="btn dice" title="Add Random Song" onClick={() => handleTransport('addRandom')} disabled={!isAuthenticated}>🎲</button>
                     </div>
 
@@ -1283,11 +1312,11 @@ export default function App() {
                         <div className="time">{fmtTime(state.position)}</div>
                         <input
                             className="seek" type="range" min="0" max="1000"
-                            value={state.seeking ? Math.round((state.position / (currentTrack?.duration || 1)) * 1000) : seekValue} // Directly use position while seeking
-                            // style={seekFillStyle} // Style might be handled via CSS pseudo-elements if preferred
-                            onInput={handleSeekInput} // Use onInput for immediate feedback
-                            onChange={handleSeekChange} // Use onChange for final value on release
+                            value={seekValue} // Use derived state for slider position
+                            onInput={handleSeekInput}
+                            onChange={handleSeekChange}
                             disabled={!isAuthenticated || !currentTrack}
+                            aria-label="Seek slider"
                         />
                         <div className="time">{fmtTime(currentTrack?.duration || 0)}</div>
                     </div>
@@ -1298,9 +1327,9 @@ export default function App() {
                             <input
                                 type="range" min="0" max="100"
                                 value={Math.round(state.gain * 100)}
-                                // style={volFillStyle} // Style might be handled via CSS
-                                onChange={handleVolumeChange} // Continuous update okay for volume
+                                onChange={handleVolumeChange}
                                 disabled={!isAuthenticated}
+                                aria-label="Volume slider"
                             />
                             <div className="volpct">{Math.round(state.gain * 100)}%</div>
                         </div>
@@ -1309,18 +1338,23 @@ export default function App() {
 
                 <aside className="side-card">
                     <h3>Queue</h3>
-                     {/* Ensure the container itself scrolls */}
-                    <div className="queue" style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                        {state.playlist.map((song, index) => (
-                            <JukeboxQueueItem
-                                key={song.id ? `${song.id}-${index}`: index} // More robust key for duplicates
-                                song={song}
-                                index={index}
-                                currentIndex={state.currentIndex}
-                                onAction={handleQueueAction}
-                            />
-                        ))}
-                         {state.playlist.length === 0 && <div style={{textAlign: 'center', color: 'var(--muted)', padding: '20px'}}>Queue is empty</div>}
+                     {/* The .queue div handles scrolling */}
+                    <div className="queue">
+                        {state.playlist.length > 0 ? (
+                            state.playlist.map((song, index) => (
+                                <JukeboxQueueItem
+                                    key={song.id ? `${song.id}-${index}`: `track-${index}`} // Ensure unique key
+                                    song={song}
+                                    index={index}
+                                    currentIndex={state.currentIndex}
+                                    onAction={handleQueueAction}
+                                />
+                            ))
+                        ) : (
+                             <div style={{textAlign: 'center', color: 'var(--muted)', padding: '20px'}}>
+                                 {isAuthenticated ? "Queue is empty. Add songs!" : "Please log in."}
+                             </div>
+                        )}
                     </div>
 
                     <div className="search-box">
@@ -1329,15 +1363,15 @@ export default function App() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             disabled={!isAuthenticated}
-                            style={{ width: '100%' }} // Ensure input fills width
+                            style={{ width: '100%' }}
+                            aria-label="Search songs"
                         />
-                         {/* Conditional rendering for search results */}
                         {searchResults.length > 0 && (
                             <div className="search-results">
                                 {searchResults.map((song) => (
-                                    <div key={song.id} className="srow" onClick={() => addSongFromSearch(song)}>
-                                        <img src={coverArtUrl(song.coverArt, 40)} alt="" // Empty alt is okay for decorative
-                                             onError={(e) => e.target.style.visibility='hidden'}/>
+                                    <div key={song.id} className="srow" onClick={() => addSongFromSearch(song)} title={`Add ${song.title}`}>
+                                        <img src={coverArtUrl(song.coverArt, 40)} alt=""
+                                             onError={(e) => { e.target.style.visibility='hidden'; }}/>
                                         <div className="s-meta">
                                             <div className="qi-title" style={{color: 'var(--green-on)'}}>{escapeHtml(song.title || 'Unknown')}</div>
                                             <div className="s-artist" style={{fontSize: '0.8em', color: 'var(--muted)'}}>{escapeHtml(song.artist || '')} • {escapeHtml(song.album || '')}</div>
@@ -1350,21 +1384,25 @@ export default function App() {
                     </div>
 
                     <div className="config">
-                        <div className="row">
-                            <input id="serverUrl" placeholder="Server URL (e.g., http://host:port)" value={configForm.serverUrl || ''} onChange={handleConfigChange} disabled={isAuthenticated} style={{flex: 2}}/>
-                            <input id="username" placeholder="Username" value={configForm.username || ''} onChange={handleConfigChange} disabled={isAuthenticated} style={{flex: 1}}/>
-                            <input id="password" placeholder="Password" type="password" value={configForm.password || ''} onChange={handleConfigChange} onKeyPress={(e) => e.key === 'Enter' && !isAuthenticated && handleLogin()} disabled={isAuthenticated} style={{flex: 1}}/>
-                            <button onClick={handleLogin} disabled={isAuthenticated} style={{flex: 0.5}}>
-                                {isAuthenticated ? '✓' : 'Login'}
-                            </button>
-                        </div>
-                        <div className="small">
-                            {isAuthenticated
-                                ? `✓ Connected to ${config.serverUrl} as ${config.username}`
-                                : '💡 Tip: Leave Server URL empty for relative path (if using proxy).'}
-                        </div>
-                         {isAuthenticated && ( // Add a Logout button
-                             <button onClick={() => { clearSession(); setIsAuthenticated(false); setStatusText("Logged out"); setState(initialState); }} style={{ padding: '5px', marginTop: '5px', background: 'var(--danger)', color: 'white', border: '1px solid black'}}>Logout</button>
+                        {!isAuthenticated ? (
+                            <>
+                                <div className="row">
+                                    <input id="serverUrl" placeholder="Server URL (e.g., http://host:port)" value={configForm.serverUrl || ''} onChange={handleConfigChange} style={{flex: 2}} aria-label="Server URL"/>
+                                    <input id="username" placeholder="Username" value={configForm.username || ''} onChange={handleConfigChange} style={{flex: 1}} aria-label="Username"/>
+                                    <input id="password" placeholder="Password" type="password" value={configForm.password || ''} onChange={handleConfigChange} onKeyPress={(e) => e.key === 'Enter' && handleLogin()} style={{flex: 1}} aria-label="Password"/>
+                                    <button onClick={handleLogin} style={{flex: 0.5}}>Login</button>
+                                </div>
+                                <div className="small">
+                                    💡 Tip: Leave Server URL empty for relative path (if using proxy).
+                                </div>
+                            </>
+                         ) : (
+                            <>
+                                <div className="small" style={{ textAlign: 'center' }}>
+                                    ✓ Connected to {config.serverUrl} as {config.username}
+                                </div>
+                                <button onClick={handleLogout} style={{ padding: '8px', marginTop: '5px', background: 'var(--danger)', color: 'white', border: '1px solid black', cursor: 'pointer', width: '100%' }}>Logout</button>
+                             </>
                          )}
                     </div>
                 </aside>
