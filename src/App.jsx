@@ -276,50 +276,81 @@ const styles = `
       html, body {
         padding: 0;
         background: #000;
+        display: block;
       }
 
       .player-shell {
-        all: unset;
         display: flex;
         flex-direction: column;
         width: 100%;
         min-height: 100vh;
         padding: 0;
+        background: #000;
+        box-shadow: none;
+        border: none;
       }
 
-      .cover-card, .transport-card, .side-card {
-        all: unset;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+      .cover-card {
         padding: 12px;
+        background: transparent;
+        box-shadow: none;
+        border: none;
+        align-items: center;
+        gap: 8px;
       }
 
       .cover-card .cover {
-        width: 100%;
+        width: 90vw;
+        max-width: 320px;
         height: auto;
         border-radius: 6px;
       }
 
+      .cover-card .title,
+      .cover-card .artist,
+      .cover-card .album {
+        font-size: 14px;
+        word-break: break-word;
+      }
+
+      .transport-card {
+        padding: 12px;
+        background: transparent;
+        box-shadow: none;
+        border: none;
+      }
+
       .transport-card .controls {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        justify-items: center;
       }
 
       .btn {
         flex: 1 1 auto;
-        max-width: 64px;
+        max-width: 60px;
         font-size: 20px;
       }
 
       .btn.primary {
-        max-width: 80px;
-        font-size: 24px;
+        max-width: 72px;
+        font-size: 22px;
       }
 
-      .status-row, .progress, .vol, .queue {
+      .status-row,
+      .progress,
+      .vol,
+      .queue {
         width: 100%;
+        font-size: 12px;
+      }
+
+      .side-card {
+        padding: 12px;
+        background: transparent;
+        box-shadow: none;
+        border: none;
       }
 
       .queue {
