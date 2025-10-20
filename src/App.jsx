@@ -321,10 +321,11 @@ const styles = `
       }
 
       .transport-card .controls {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 6px;
-        justify-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
       }
 
       .btn {
@@ -356,6 +357,17 @@ const styles = `
       .queue {
         max-height: 40vh;
         overflow-y: auto;
+      }
+      /* Login form adjustments for mobile */
+      .config .row {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .config input,
+      .config button {
+        width: 100%;
+        font-size: 16px;
       }
     }
 `;
