@@ -1,45 +1,31 @@
 /* Volume slider in green */
-.vol input[type="range"] {
+#volume {
   background: linear-gradient(90deg, var(--green-on) var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%));
 }
 
-.vol input[type="range"]::-webkit-slider-thumb {
-  background: #fff;
-  border: 2px solid var(--green-on);
-}
-
-.vol input[type="range"]::-moz-range-thumb {
-  border: 2px solid var(--green-on);
-}
-
-/* Force volume slider to match green styling */
-#volume {
-  background: linear-gradient(90deg, var(--green-on) var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%)) !important;
-}
-
-#volume::-webkit-slider-thumb {
-  background: #fff;
-  border: 2px solid var(--green-on);
-}
-
+#volume::-webkit-slider-thumb,
 #volume::-moz-range-thumb {
   background: #fff;
   border: 2px solid var(--green-on);
 }
 
-/* Stronger override for volume track styling */
-input[type="range"]#volume {
-  background: linear-gradient(90deg, var(--green-on) var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%)) !important;
+/* Seek (progress) slider in green */
+.seek {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--green-on) var(--seek-fill, 0%), rgba(255, 255, 255, 0.16) var(--seek-fill, 0%));
+  outline: none;
+  cursor: pointer;
 }
 
-/* Green border thumb for WebKit */
-input[type="range"]#volume::-webkit-slider-thumb {
+.seek::-webkit-slider-thumb,
+.seek::-moz-range-thumb {
   background: #fff;
   border: 2px solid var(--green-on);
-}
-
-/* Green border thumb for Firefox */
-input[type="range"]#volume::-moz-range-thumb {
-  background: #fff;
-  border: 2px solid var(--green-on);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
 }
