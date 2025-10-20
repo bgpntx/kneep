@@ -1034,6 +1034,7 @@ export default function App() {
                         <div className="vol-row">
                             <div title="Volume">🔊</div>
                             <input 
+                                id="volume"
                                 type="range" min="0" max="100" 
                                 value={Math.round(state.gain * 100)}
                                 style={volFillStyle}

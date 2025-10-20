@@ -26,3 +26,20 @@
   background: #fff;
   border: 2px solid var(--green-on);
 }
+
+/* Stronger override for volume track styling */
+input[type="range"]#volume {
+  background: linear-gradient(90deg, var(--green-on) var(--vol-fill, 100%), rgba(255, 255, 255, 0.16) var(--vol-fill, 100%)) !important;
+}
+
+/* Green border thumb for WebKit */
+input[type="range"]#volume::-webkit-slider-thumb {
+  background: #fff;
+  border: 2px solid var(--green-on);
+}
+
+/* Green border thumb for Firefox */
+input[type="range"]#volume::-moz-range-thumb {
+  background: #fff;
+  border: 2px solid var(--green-on);
+}
