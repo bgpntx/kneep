@@ -214,7 +214,7 @@ const styles = `
       --mobile-padding: 12px;
       --queue-height-desktop: 500px;
       --queue-height-mobile: 40vh;
-    }
+    }      
     .btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-size); height: var(--btn-size); border-radius: var(--btn-radius); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); cursor: pointer; transition: transform 120ms ease, background 120ms ease, opacity 120ms ease; user-select: none; -webkit-tap-highlight-color: transparent; }
     .btn.primary { width: var(--btn-primary-size); height: var(--btn-primary-size); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); }
     .btn.dice { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.04); box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02); }
@@ -948,7 +948,7 @@ export default function App() {
 
                 <aside className="side-card">
                     <h3>Queue</h3>
-                    <div className="queue">
+                    <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
                         {state.playlist.map((song, index) => (
                             <JukeboxQueueItem 
                                 key={song.id || index} song={song}
