@@ -31,8 +31,8 @@ A modern, beautiful web interface for controlling [Navidrome](https://www.navidr
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
-cd navidrome-jukebox-web
+git clone https://github.com/bgpntx/kneep.git
+cd kneep
 ```
 
 ### 2. Configure Navidrome
