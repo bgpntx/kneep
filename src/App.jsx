@@ -234,6 +234,7 @@ const styles = `
     .cover-card { grid-area: cover; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: flex-start; background: rgb(45, 45, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; color: var(--green-on); text-align: center; }
     .cover-card .cover { width: 320px; height: 320px; max-width: 100%; aspect-ratio: 1/1; border-radius: 4px; object-fit: cover; background: var(--playlist-bg); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); }
     .cover-card .title, .cover-card .artist, .cover-card .album { color: var(--green-on); text-align: center; width: 100%; }
+    .cover-card .format-info { color: var(--text-gray); text-align: center; width: 100%; font-size: 11px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; } /* New style for bitrate */
     .side-card { grid-area: queue; padding: 14px 18px; overflow: hidden; display: flex; flex-direction: column; gap: 12px; background: rgb(45, 45, 69); border: 1px solid var(--text-gray); box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); border-radius: 2px; }
     .transport-card .controls { display: flex; flex-direction: row; gap: 10px; align-items: center; justify-content: center; width: 100%; flex-wrap: wrap; padding: 6px 0; }
     .transport-card .btn { width: 50px; height: 50px; border-radius: 8px; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; }
@@ -999,6 +1000,17 @@ export default function App() {
                     <img className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 900)} />
                     <div className="meta">
                         <div className="title">{currentTrack?.title || 'Nothing playing'}</div>
+                        
+                        {/* --- ADDED CODE --- */}
+                        {currentTrack && (currentTrack.suffix || currentTrack.bitRate) && (
+                            <div className="format-info">
+                                {currentTrack.suffix || ''}
+                                {currentTrack.suffix && currentTrack.bitRate && ' • '}
+                                {currentTrack.bitRate ? `${currentTrack.bitRate} kbps` : ''}
+                            </div>
+                        )}
+                        {/* --- END ADDED CODE --- */}
+                        
                         <div className="artist">{currentTrack?.artist || '—'}</div>
                         <div className="album">{currentTrack?.album || ''}&nbsp;</div>
                     </div>
