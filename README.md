@@ -10,7 +10,7 @@ A modern, beautiful web interface for controlling [Navidrome](https://www.navidr
 
 - **🎛️ Full Jukebox Control** - Play, pause, skip, shuffle, and manage your music queue
 - **🔍 Real-time Search** - Search your entire music library and add songs instantly
-- **🎨 Modern UI** - Beautiful glassmorphic design with smooth animations
+- ~~**🎨 Modern UI** - Beautiful glassmorphic design with smooth animations~~ Old classic Winamp style 😜
 - **📱 Responsive** - Works seamlessly on desktop, tablet, and mobile devices
 - **🎚️ Volume Control** - Adjust playback volume remotely
 - **🔁 Repeat Modes** - Repeat off, repeat all, or repeat one track
