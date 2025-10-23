@@ -829,7 +829,7 @@ export default function App() {
                     setTimeout(() => {
                         const latestState = stateRef.current;
                         // Only set status if it hasn't been changed by something else
-                        if (statusText === `Scrobbled: ${tr.title}`) {
+                        if (statusText === `Scrobble: ${tr.title}`) {
                             setStatusText(latestState.playing ? '▶️ Playing' : '⏸️ Paused');
                         }
                     }, 3000);
@@ -1037,17 +1037,26 @@ export default function App() {
         })
     );
 
-    // --- MODIFIED: DND-KIT DRAG END HANDLER ---
+    // --- ###################################### ---
+    // --- THIS IS THE MODIFIED FUNCTION WITH THE ---
+    // ---           SEAMLESS PLAYBACK FIX        ---
+    // --- ###################################### ---
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
             
-            // --- FIX: Store current playback state ---
+            // --- FIX: Store current playback state AND CALCULATE PRECISE POSITION ---
             const currentState = stateRef.current;
             const wasPlaying = currentState.playing;
-            const currentTrackId = currentState.playlist[currentState.currentIndex]?.id;
-            const currentPosition = currentState.position;
+            const currentTrack = currentState.playlist[currentState.currentIndex];
+            const currentTrackId = currentTrack?.id;
+            
+            // Calculate the *precise* position at the moment of the drop
+            // using the same logic as the visual ticker
+            const dur = Math.max(0, currentTrack?.duration || 0);
+            const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+            const precisePosition = Math.min(dur, currentState.localTickStart + dt);
             // --- END FIX ---
 
             const currentPlaylist = currentState.playlist;
@@ -1083,8 +1092,8 @@ export default function App() {
                     : -1;
 
                 if (newPlayingIndex !== -1) {
-                    // 5. Tell the server to skip to that song and position
-                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${Math.floor(currentPosition)}`);
+                    // 5. Tell the server to skip to that song and PRECISE position
+                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${Math.floor(precisePosition)}`);
                     
                     // 6. If it was playing, tell the server to start again
                     if (wasPlaying) {
