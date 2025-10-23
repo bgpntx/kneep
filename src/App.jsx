@@ -190,7 +190,6 @@ async function reconnect() {
 
 
 // --- Styles (formerly App.css) ---
-/* ... Styles remain the same ... */
 const styles = `
     :root {
       --base-dark: #404040;
@@ -233,7 +232,7 @@ const styles = `
       --mobile-padding: 12px;
       --queue-height-desktop: 500px;
       --queue-height-mobile: 40vh;
-    }      
+    }
     .btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-size); height: var(--btn-size); border-radius: var(--btn-radius); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); cursor: pointer; transition: transform 120ms ease, background 120ms ease, opacity 120ms ease; user-select: none; -webkit-tap-highlight-color: transparent; }
     .btn.primary { width: var(--btn-primary-size); height: var(--btn-primary-size); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); }
     .btn.dice { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.04); box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02); }
@@ -268,6 +267,14 @@ const styles = `
     .qitem.dragging { opacity: 0.6; background: var(--blue-bar); box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 10; cursor: grabbing; }
     .qitem.is-active, .qitem.active, .qitem.selected { background: var(--blue-bar); color: var(--blue-text); }
     .qitem .qi-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* --- MODIFIED: Added overflow rules to .qi-meta --- */
+    .qitem .qi-meta {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden; /* Added */
+        text-overflow: ellipsis; /* Added */
+     }
     .qitem .btn { background: #1a1a1a; border: 1px solid var(--green-on); color: var(--green-on); box-shadow: inset 0 1px 0 rgba(0, 255, 0, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.5); cursor: pointer; }
     .qitem .btn:hover { background: #2a2a2a; border-color: var(--green-on); box-shadow: 0 0 4px var(--green-on); }
     .qitem .btn:active { background: var(--blue-bar); border-color: var(--blue-text); color: var(--blue-text); }
@@ -394,7 +401,6 @@ const styles = `
       }
     }
 `;
-
 
 // --- UTILITY FUNCTIONS ---
 function fmtTime(sec) {
