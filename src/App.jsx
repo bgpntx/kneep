@@ -1050,14 +1050,14 @@ export default function App() {
 
     // --- ###################################### ---
     // --- THIS IS THE MODIFIED FUNCTION WITH THE ---
-    // ---    SEAMLESS PLAYBACK FIX (ATTEMPT 2)   ---
+    // ---    SEAMLESS PLAYBACK FIX (ATTEMPT 3)   ---
     // --- ###################################### ---
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
 
-            // --- FIX V2: Store current playback state AND CALCULATE PRECISE POSITION ---
+            // --- FIX V3: Store state and calculate precise position ---
             const currentState = stateRef.current;
             const wasPlaying = currentState.playing;
             const currentTrack = currentState.playlist[currentState.currentIndex];
@@ -1065,91 +1065,88 @@ export default function App() {
 
             // Calculate the *precise* position at the moment of the drop
             const dur = Math.max(0, currentTrack?.duration || 0);
-            let precisePosition = currentState.position; // Default to last known server position
+            let precisePosition = currentState.position; // Default
             if (wasPlaying) {
-                 // Only calculate delta if it was playing
                  const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
                  precisePosition = Math.min(dur, currentState.localTickStart + dt);
             }
-            // Ensure position is non-negative and integer
             precisePosition = Math.floor(Math.max(0, precisePosition));
-            // --- END FIX V2 ---
+            // --- END FIX V3 ---
 
             const currentPlaylist = currentState.playlist;
 
             const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
             const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
 
-            if (oldIndex === -1 || newIndex === -1) return; // Should not happen
+            if (oldIndex === -1 || newIndex === -1) return;
 
             // 1. Get the new playlist order
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
 
-            // 2. Update React state immediately for snappy UI
+            // 2. Update React state immediately
             setState(prev => ({
               ...prev,
               playlist: newPlaylist,
-              // Optimistically update playing state to prevent UI flicker
-              playing: wasPlaying 
+              playing: wasPlaying // Optimistically keep playing state
             }));
 
             // 3. Get the list of IDs in the new order
             const ids = newPlaylist.map(song => song.id);
             const qs = ids.map(id => `&id=${encodeURIComponent(id)}`).join('');
 
-            // 4. Asynchronously send the update to the server
+            // 4. Asynchronously send updates to the server
             try {
                 commandInProgress.current = true;
-                if (DEBUG()) console.log(`[DnD] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
-                
-                // This call stops playback on the server
-                await callJukebox('set', qs); 
-                if (DEBUG()) console.log(`[DnD] 'set' command sent`);
+                if (DEBUG()) console.log(`[DnD V3] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
 
-                // --- FIX V2: Restore playback state ---
-                // Find the new index of the song that was playing
+                // Send the disruptive 'set' command
+                await callJukebox('set', qs);
+                if (DEBUG()) console.log(`[DnD V3] 'set' command sent`);
+
+                // --- FIX V3: Add small delay AFTER 'set' ---
+                await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
+                if (DEBUG()) console.log(`[DnD V3] 50ms delay finished`);
+                // --- END FIX V3 ---
+
+                // --- Restore playback state ---
                 const newPlayingIndex = currentTrackId
                     ? newPlaylist.findIndex(song => song.id === currentTrackId)
                     : -1;
                 
-                if (DEBUG()) console.log(`[DnD] Original track new index: ${newPlayingIndex}`);
+                if (DEBUG()) console.log(`[DnD V3] Original track new index: ${newPlayingIndex}`);
 
                 if (newPlayingIndex !== -1) {
-                    // 5. Tell the server to skip to that song and PRECISE position
-                    if (DEBUG()) console.log(`[DnD] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
-                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`); 
+                    // Send 'skip' to restore position
+                     if (DEBUG()) console.log(`[DnD V3] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
+                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`);
 
-                    // 6. If it was playing, tell the server to start again
+                    // If it was playing, send 'start'
                     if (wasPlaying) {
-                        if (DEBUG()) console.log(`[DnD] Sending 'start'`);
-                        // No delay before start, try sending immediately after skip
+                         if (DEBUG()) console.log(`[DnD V3] Sending 'start'`);
                         await callJukebox('start');
                     }
                 } else if (wasPlaying) {
-                     // If the currently playing track was somehow removed or not found (edge case), just start the new first track
-                     if (DEBUG()) console.log(`[DnD] Original track not found, starting queue from index 0`);
+                    // Fallback if original track not found
+                     if (DEBUG()) console.log(`[DnD V3] Original track not found, starting queue from index 0`);
                      await callJukebox('skip', `&index=0&offset=0`);
                      await callJukebox('start');
                 }
-                // --- END FIX V2 ---
+                // --- END Restore playback state ---
 
-                // 7. Re-sync with server state AFTER restoring
-                // Add a slightly longer delay before final refresh to let server catch up
-                if (DEBUG()) console.log(`[DnD] Waiting 150ms before final refresh`);
-                await new Promise(resolve => setTimeout(resolve, 150)); 
-                if (DEBUG()) console.log(`[DnD] Performing final refresh`);
+                // 7. Re-sync state AFTER restoring (keep previous delay)
+                if (DEBUG()) console.log(`[DnD V3] Waiting 150ms before final refresh`);
+                await new Promise(resolve => setTimeout(resolve, 150));
+                if (DEBUG()) console.log(`[DnD V3] Performing final refresh`);
                 await refreshState(true);
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
-                // If it failed, refresh to revert to server state
-                await refreshState(true);
+                await refreshState(true); // Revert on error
             } finally {
                 commandInProgress.current = false;
-                 if (DEBUG()) console.log(`[DnD] Drag end handler finished`);
+                 if (DEBUG()) console.log(`[DnD V3] Drag end handler finished`);
             }
         }
     }, [refreshState]); // refreshState dependency is correct
-
 
     // --- Derived State ---
     const currentTrack = state.playlist[state.currentIndex];
