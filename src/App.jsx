@@ -189,6 +189,7 @@ async function reconnect() {
 }
 
 // --- Styles (formerly App.css) ---
+/* ... Styles remain the same ... */
 const styles = `
     :root {
       --base-dark: #404040;
@@ -392,6 +393,7 @@ const styles = `
     }
 `;
 
+
 // --- UTILITY FUNCTIONS ---
 function fmtTime(sec) {
     sec = Math.max(0, Math.floor(sec));
@@ -493,7 +495,8 @@ export default function App() {
     }, []);
 
     // --- Media Session API Integration ---
-    const updateMediaSession = useCallback((track, position, playing) => {
+    /* ... Media Session functions remain the same ... */
+        const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
                 navigator.mediaSession.metadata = new MediaMetadata({
@@ -577,8 +580,10 @@ export default function App() {
         }
     }, []);
 
+
     // --- Core State Refresh Logic ---
-    const refreshState = useCallback(async (forceUpdate = false) => {
+    /* ... refreshState function remains the same ... */
+        const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
             return;
         }
@@ -620,7 +625,10 @@ export default function App() {
         }
     }, []);
 
-    const skipTo = useCallback(async (index, offsetSec = 0) => {
+
+    // --- Transport & Queue Actions ---
+    /* ... skipTo, handleTransport, handleQueueAction remain the same ... */
+        const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
         
@@ -698,11 +706,11 @@ export default function App() {
             commandInProgress.current = false;
         }
     }, [skipTo, refreshState]);
+
     
     // --- Effects & Listeners ---
-
-    // *** FIX 1: Add this effect to handle tab visibility ***
-    useEffect(() => {
+    /* ... All useEffect hooks remain the same ... */
+        useEffect(() => {
         const handleVisibilityChange = () => {
             // Check if the page is NOT hidden (i.e., it just became visible)
             if (document.hidden === false && isAuthenticated) {
@@ -923,8 +931,10 @@ export default function App() {
         return () => clearInterval(tickInterval);
     }, []); // Empty dependency array, this effect runs once and manages its own state via refs
 
-    // Volume Change Handler
-    const handleVolumeChange = useCallback(async (e) => {
+
+    // --- Input Handlers (Volume, Seek, Search, Login) ---
+    /* ... handleVolumeChange, handleSeekInput, handleSeekChange, addSongFromSearch, handleConfigChange, handleLogin remain the same ... */
+        const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
         
@@ -1029,7 +1039,8 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
-    // --- ADDED: DND-KIT SENSORS ---
+
+    // --- DND-KIT SENSORS ---
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -1039,77 +1050,102 @@ export default function App() {
 
     // --- ###################################### ---
     // --- THIS IS THE MODIFIED FUNCTION WITH THE ---
-    // ---           SEAMLESS PLAYBACK FIX        ---
+    // ---    SEAMLESS PLAYBACK FIX (ATTEMPT 2)   ---
     // --- ###################################### ---
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
-            
-            // --- FIX: Store current playback state AND CALCULATE PRECISE POSITION ---
+
+            // --- FIX V2: Store current playback state AND CALCULATE PRECISE POSITION ---
             const currentState = stateRef.current;
             const wasPlaying = currentState.playing;
             const currentTrack = currentState.playlist[currentState.currentIndex];
             const currentTrackId = currentTrack?.id;
-            
+
             // Calculate the *precise* position at the moment of the drop
-            // using the same logic as the visual ticker
             const dur = Math.max(0, currentTrack?.duration || 0);
-            const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
-            const precisePosition = Math.min(dur, currentState.localTickStart + dt);
-            // --- END FIX ---
+            let precisePosition = currentState.position; // Default to last known server position
+            if (wasPlaying) {
+                 // Only calculate delta if it was playing
+                 const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+                 precisePosition = Math.min(dur, currentState.localTickStart + dt);
+            }
+            // Ensure position is non-negative and integer
+            precisePosition = Math.floor(Math.max(0, precisePosition));
+            // --- END FIX V2 ---
 
             const currentPlaylist = currentState.playlist;
-            
+
             const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
             const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
-    
+
             if (oldIndex === -1 || newIndex === -1) return; // Should not happen
-    
+
             // 1. Get the new playlist order
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
-    
+
             // 2. Update React state immediately for snappy UI
             setState(prev => ({
               ...prev,
               playlist: newPlaylist,
+              // Optimistically update playing state to prevent UI flicker
+              playing: wasPlaying 
             }));
-    
+
             // 3. Get the list of IDs in the new order
             const ids = newPlaylist.map(song => song.id);
             const qs = ids.map(id => `&id=${encodeURIComponent(id)}`).join('');
-    
+
             // 4. Asynchronously send the update to the server
             try {
                 commandInProgress.current = true;
+                if (DEBUG()) console.log(`[DnD] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
+                
                 // This call stops playback on the server
                 await callJukebox('set', qs); 
-                
-                // --- FIX: Restore playback state ---
+                if (DEBUG()) console.log(`[DnD] 'set' command sent`);
+
+                // --- FIX V2: Restore playback state ---
                 // Find the new index of the song that was playing
-                const newPlayingIndex = currentTrackId 
-                    ? newPlaylist.findIndex(song => song.id === currentTrackId) 
+                const newPlayingIndex = currentTrackId
+                    ? newPlaylist.findIndex(song => song.id === currentTrackId)
                     : -1;
+                
+                if (DEBUG()) console.log(`[DnD] Original track new index: ${newPlayingIndex}`);
 
                 if (newPlayingIndex !== -1) {
                     // 5. Tell the server to skip to that song and PRECISE position
-                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${Math.floor(precisePosition)}`);
-                    
+                    if (DEBUG()) console.log(`[DnD] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
+                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`); 
+
                     // 6. If it was playing, tell the server to start again
                     if (wasPlaying) {
+                        if (DEBUG()) console.log(`[DnD] Sending 'start'`);
+                        // No delay before start, try sending immediately after skip
                         await callJukebox('start');
                     }
+                } else if (wasPlaying) {
+                     // If the currently playing track was somehow removed or not found (edge case), just start the new first track
+                     if (DEBUG()) console.log(`[DnD] Original track not found, starting queue from index 0`);
+                     await callJukebox('skip', `&index=0&offset=0`);
+                     await callJukebox('start');
                 }
-                // --- END FIX ---
+                // --- END FIX V2 ---
 
                 // 7. Re-sync with server state AFTER restoring
-                await refreshState(true); 
+                // Add a slightly longer delay before final refresh to let server catch up
+                if (DEBUG()) console.log(`[DnD] Waiting 150ms before final refresh`);
+                await new Promise(resolve => setTimeout(resolve, 150)); 
+                if (DEBUG()) console.log(`[DnD] Performing final refresh`);
+                await refreshState(true);
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
                 // If it failed, refresh to revert to server state
                 await refreshState(true);
             } finally {
                 commandInProgress.current = false;
+                 if (DEBUG()) console.log(`[DnD] Drag end handler finished`);
             }
         }
     }, [refreshState]); // refreshState dependency is correct
@@ -1198,7 +1234,7 @@ export default function App() {
                 <aside className="side-card">
                     <h3>Queue</h3>
                     
-                    {/* --- MODIFIED: QUEUE LIST WRAPPED IN DND-KIT CONTEXTS --- */}
+                    {/* --- QUEUE LIST WRAPPED IN DND-KIT CONTEXTS --- */}
                     <DndContext 
                         sensors={sensors}
                         collisionDetection={closestCenter}
@@ -1222,7 +1258,7 @@ export default function App() {
                             </div>
                         </SortableContext>
                     </DndContext>
-                    {/* --- END OF MODIFIED QUEUE LIST --- */}
+                    {/* --- END OF QUEUE LIST --- */}
                     
                     <div className="search-box">
                         <input 
