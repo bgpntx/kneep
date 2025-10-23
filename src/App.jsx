@@ -1,6 +1,6 @@
 // src/App.jsx - All-in-one Jukebox Player with Scrobbling & Drag-n-Drop
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-// --- ADDED DND-KIT IMPORTS ---
+// --- DND-KIT IMPORTS ---
 import {
   DndContext,
   closestCenter,
@@ -1037,13 +1037,20 @@ export default function App() {
         })
     );
 
-    // --- ADDED: DND-KIT DRAG END HANDLER ---
+    // --- MODIFIED: DND-KIT DRAG END HANDLER ---
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
-            // Get the current playlist from the ref for accuracy in async handler
-            const currentPlaylist = stateRef.current.playlist;
+            
+            // --- FIX: Store current playback state ---
+            const currentState = stateRef.current;
+            const wasPlaying = currentState.playing;
+            const currentTrackId = currentState.playlist[currentState.currentIndex]?.id;
+            const currentPosition = currentState.position;
+            // --- END FIX ---
+
+            const currentPlaylist = currentState.playlist;
             
             const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
             const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
@@ -1066,9 +1073,27 @@ export default function App() {
             // 4. Asynchronously send the update to the server
             try {
                 commandInProgress.current = true;
-                // This is the API call to update the server's queue order
-                await callJukebox('set', qs);
-                // 5. Re-sync with server state after API call to be 100% sure
+                // This call stops playback on the server
+                await callJukebox('set', qs); 
+                
+                // --- FIX: Restore playback state ---
+                // Find the new index of the song that was playing
+                const newPlayingIndex = currentTrackId 
+                    ? newPlaylist.findIndex(song => song.id === currentTrackId) 
+                    : -1;
+
+                if (newPlayingIndex !== -1) {
+                    // 5. Tell the server to skip to that song and position
+                    await callJukebox('skip', `&index=${newPlayingIndex}&offset=${Math.floor(currentPosition)}`);
+                    
+                    // 6. If it was playing, tell the server to start again
+                    if (wasPlaying) {
+                        await callJukebox('start');
+                    }
+                }
+                // --- END FIX ---
+
+                // 7. Re-sync with server state AFTER restoring
                 await refreshState(true); 
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
@@ -1078,7 +1103,7 @@ export default function App() {
                 commandInProgress.current = false;
             }
         }
-    }, [refreshState]); // Add refreshState dependency
+    }, [refreshState]); // refreshState dependency is correct
 
 
     // --- Derived State ---
