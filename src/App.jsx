@@ -1,5 +1,22 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling
+// src/App.jsx - All-in-one Jukebox Player with Scrobbling & Drag-n-Drop
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+// --- ADDED DND-KIT IMPORTS ---
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // --- Jukebox API Logic (formerly jukeboxApi.js) ---
 
@@ -242,11 +259,13 @@ const styles = `
     .transport-card .btn.dice { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.05); }
     .side-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
     .queue-list { flex: 1 1 auto; overflow-y: auto; padding-right: 6px; background: var(--playlist-bg); }
-    .qitem { display: grid; grid-template-columns: 40px 1fr var(--q-actions-w); gap: 12px; align-items: center; padding: 10px 8px; min-height: 56px; background: var(--playlist-bg); border-bottom: 1px solid var(--bevel-lo); color: var(--green-on); font-family: "Lucida Console", Monaco, monospace; }
+    .qitem { display: grid; grid-template-columns: 40px 1fr var(--q-actions-w); gap: 12px; align-items: center; padding: 10px 8px; min-height: 56px; background: var(--playlist-bg); border-bottom: 1px solid var(--bevel-lo); color: var(--green-on); font-family: "Lucida Console", Monaco, monospace; cursor: grab; }
     .qitem:hover { background: #0a0a0a; }
+    /* --- ADDED DRAGGING STYLE --- */
+    .qitem.dragging { opacity: 0.6; background: var(--blue-bar); box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 10; cursor: grabbing; }
     .qitem.is-active, .qitem.active, .qitem.selected { background: var(--blue-bar); color: var(--blue-text); }
     .qitem .qi-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .qitem .btn { background: #1a1a1a; border: 1px solid var(--green-on); color: var(--green-on); box-shadow: inset 0 1px 0 rgba(0, 255, 0, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.5); }
+    .qitem .btn { background: #1a1a1a; border: 1px solid var(--green-on); color: var(--green-on); box-shadow: inset 0 1px 0 rgba(0, 255, 0, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.5); cursor: pointer; }
     .qitem .btn:hover { background: #2a2a2a; border-color: var(--green-on); box-shadow: 0 0 4px var(--green-on); }
     .qitem .btn:active { background: var(--blue-bar); border-color: var(--blue-text); color: var(--blue-text); }
     @media (max-width: 520px) { .transport-card .btn { width: 44px; height: 44px; } .transport-card .btn.primary { width: 56px; height: 56px; } :root { --q-actions-w: 88px; --q-action-btn: 28px; } .qitem { grid-template-columns: 28px 1fr var(--q-actions-w); min-height: 52px; } .cover-card .cover { width: 240px; height: 240px; } }
@@ -395,13 +414,34 @@ const initialState = {
     endHandledForId: null,
 };
 
-// Component for a single queue item
-function JukeboxQueueItem({ song, index, currentIndex, onAction }) {
+// --- MODIFIED: Component for a single sortable queue item ---
+function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const isCurrent = index === currentIndex;
-    
+
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: id }); // Use the song ID as the unique ID
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        touchAction: 'none', // Recommended for pointer sensors
+    };
+
+    const className = `qitem${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`;
+
     return (
         <div 
-            className={`qitem${isCurrent ? ' current' : ''}`}
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners} // Attach listeners to the whole item
+            className={className}
             data-index={index}
         >
             <div className="idx">{index + 1}</div>
@@ -410,8 +450,19 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction }) {
                 <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
             </div>
             <div className="qi-actions">
-                <button title="Play here" className="btn" onClick={() => onAction('play', index)}>▶️</button>
-                <button title="Remove" className="btn" onClick={() => onAction('remove', index)}>✖️</button>
+                {/* Add onPointerDown to stop drag from starting on buttons */}
+                <button 
+                    title="Play here" 
+                    className="btn" 
+                    onClick={(e) => { e.stopPropagation(); onAction('play', index); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                >▶️</button>
+                <button 
+                    title="Remove" 
+                    className="btn" 
+                    onClick={(e) => { e.stopPropagation(); onAction('remove', index); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                >✖️</button>
             </div>
         </div>
     );
@@ -978,6 +1029,58 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
+    // --- ADDED: DND-KIT SENSORS ---
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+          coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    // --- ADDED: DND-KIT DRAG END HANDLER ---
+    const handleDragEnd = useCallback(async (event) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            // Get the current playlist from the ref for accuracy in async handler
+            const currentPlaylist = stateRef.current.playlist;
+            
+            const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
+            const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
+    
+            if (oldIndex === -1 || newIndex === -1) return; // Should not happen
+    
+            // 1. Get the new playlist order
+            const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
+    
+            // 2. Update React state immediately for snappy UI
+            setState(prev => ({
+              ...prev,
+              playlist: newPlaylist,
+            }));
+    
+            // 3. Get the list of IDs in the new order
+            const ids = newPlaylist.map(song => song.id);
+            const qs = ids.map(id => `&id=${encodeURIComponent(id)}`).join('');
+    
+            // 4. Asynchronously send the update to the server
+            try {
+                commandInProgress.current = true;
+                // This is the API call to update the server's queue order
+                await callJukebox('set', qs);
+                // 5. Re-sync with server state after API call to be 100% sure
+                await refreshState(true); 
+            } catch (e) {
+                console.error('Failed to reorder queue:', e);
+                // If it failed, refresh to revert to server state
+                await refreshState(true);
+            } finally {
+                commandInProgress.current = false;
+            }
+        }
+    }, [refreshState]); // Add refreshState dependency
+
+
     // --- Derived State ---
     const currentTrack = state.playlist[state.currentIndex];
     
@@ -1060,15 +1163,32 @@ export default function App() {
 
                 <aside className="side-card">
                     <h3>Queue</h3>
-                    <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
-                        {state.playlist.map((song, index) => (
-                            <JukeboxQueueItem 
-                                key={song.id || index} song={song}
-                                index={index} currentIndex={state.currentIndex}
-                                onAction={handleQueueAction}
-                            />
-                        ))}
-                    </div>
+                    
+                    {/* --- MODIFIED: QUEUE LIST WRAPPED IN DND-KIT CONTEXTS --- */}
+                    <DndContext 
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext 
+                            items={state.playlist.map(s => s.id)} // Provide list of unique IDs
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
+                                {state.playlist.map((song, index) => (
+                                    <JukeboxQueueItem 
+                                        key={song.id} // Key must be stable and match the ID
+                                        id={song.id}  // Pass ID to useSortable
+                                        song={song}
+                                        index={index} 
+                                        currentIndex={state.currentIndex}
+                                        onAction={handleQueueAction}
+                                    />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                    {/* --- END OF MODIFIED QUEUE LIST --- */}
                     
                     <div className="search-box">
                         <input 
