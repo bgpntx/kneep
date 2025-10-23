@@ -1,4 +1,4 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling & Drag-n-Drop
+// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 // --- DND-KIT IMPORTS ---
 import {
@@ -18,8 +18,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// --- Jukebox API Logic (formerly jukeboxApi.js) ---
-
+// --- Jukebox API Logic ---
+// ... (md5, API calls, etc. - functions remain the same) ...
 const API_VERSION = '1.16.1';
 const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
 
@@ -151,9 +151,9 @@ async function searchSongs(query) {
     return data?.['subsonic-response']?.searchResult3?.song || [];
 }
 async function scrobble(id, submission = false) {
-    if (!isSessionValid() || !id) { 
-        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.'); 
-        return; 
+    if (!isSessionValid() || !id) {
+        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.');
+        return;
     }
     const extra = `&id=${encodeURIComponent(id)}&submission=${submission}`;
     const url = `${config.serverUrl}/rest/scrobble?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json${extra}`;
@@ -187,6 +187,7 @@ async function reconnect() {
     if (!isSessionValid()) return false;
     try { await callJukebox('get'); return true; } catch (error) { clearSession(); return false; }
 }
+
 
 // --- Styles (formerly App.css) ---
 /* ... Styles remain the same ... */
@@ -236,14 +237,15 @@ const styles = `
     .btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-size); height: var(--btn-size); border-radius: var(--btn-radius); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); cursor: pointer; transition: transform 120ms ease, background 120ms ease, opacity 120ms ease; user-select: none; -webkit-tap-highlight-color: transparent; }
     .btn.primary { width: var(--btn-primary-size); height: var(--btn-primary-size); background: var(--base-dark); border: 1px solid var(--btn-border); color: var(--text-gray); box-shadow: var(--btn-shadow); }
     .btn.dice { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.04); box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02); }
-    .btn.shuffle { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border: 1px solid var(--btn-border); box-shadow: var(--btn-shadow); color: var(--text); display: inline-flex; align-items: center; justify-content: center; width: var(--btn-size); height: var(--btn-size); border-radius: var(--btn-radius); }
+    .btn.shuffle, .btn.repeat { /* Apply shuffle style to repeat */ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border: 1px solid var(--btn-border); box-shadow: var(--btn-shadow); color: var(--text); display: inline-flex; align-items: center; justify-content: center; width: var(--btn-size); height: var(--btn-size); border-radius: var(--btn-radius); }
+    .btn.repeat.active { /* Style for when repeat is 'all' or 'one' */ box-shadow: inset 0 0 0 2px var(--green-on); color: var(--green-on); }
     .btn.compact { width: 36px; height: 36px; border-radius: 9px; font-size: 13px; }
     .btn:hover { transform: translateY(-1px); background: #474747; }
     .btn:active { transform: translateY(0) scale(0.98); background: rgb(48, 188, 255); box-shadow: inset 0 1px 0 var(--bevel-lo); }
     .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--blue-bar); }
     .btn[disabled], .btn:disabled { opacity: 0.5; pointer-events: none; transform: none; box-shadow: none; }
     .btn > svg, .btn > i, .btn > img { width: 56%; height: 56%; display: block; object-fit: contain; }
-    @media (max-width: 520px) { :root { --btn-size: 44px; --btn-primary-size: 56px; } .btn.compact { width: 30px; height: 30px; } .btn.shuffle { width: var(--btn-size); height: var(--btn-size); } }
+    @media (max-width: 520px) { :root { --btn-size: 44px; --btn-primary-size: 56px; } .btn.compact { width: 30px; height: 30px; } .btn.shuffle, .btn.repeat { width: var(--btn-size); height: var(--btn-size); } }
     .btn.flat { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); box-shadow: none; transform: none; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; font-family: "Lucida Console", Monaco, monospace; color: var(--text); background: rgb(33, 33, 49); display: grid; place-items: center; padding: 24px; }
@@ -411,12 +413,14 @@ const initialState = {
     position: 0,
     lastStatusTs: 0,
     localTickStart: 0,
-    repeatMode: 'off',
+    // --- ADDED: repeatMode to initial state ---
+    repeatMode: 'off', // 'off', 'all', 'one'
     seeking: false,
     endHandledForId: null,
 };
 
-// --- MODIFIED: Component for a single sortable queue item ---
+// --- Component for a single sortable queue item ---
+/* ... JukeboxQueueItem component remains the same ... */
 function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const isCurrent = index === currentIndex;
 
@@ -438,7 +442,7 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const className = `qitem${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`;
 
     return (
-        <div 
+        <div
             ref={setNodeRef}
             style={style}
             {...attributes}
@@ -453,15 +457,15 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
             </div>
             <div className="qi-actions">
                 {/* Add onPointerDown to stop drag from starting on buttons */}
-                <button 
-                    title="Play here" 
-                    className="btn" 
+                <button
+                    title="Play here"
+                    className="btn"
                     onClick={(e) => { e.stopPropagation(); onAction('play', index); }}
                     onPointerDown={(e) => e.stopPropagation()}
                 >▶️</button>
-                <button 
-                    title="Remove" 
-                    className="btn" 
+                <button
+                    title="Remove"
+                    className="btn"
                     onClick={(e) => { e.stopPropagation(); onAction('remove', index); }}
                     onPointerDown={(e) => e.stopPropagation()}
                 >✖️</button>
@@ -471,21 +475,26 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
 }
 
 export default function App() {
+    // --- State variables ---
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [configForm, setConfigForm] = useState({ serverUrl: '', username: '', password: '' });
     const [searchResults, setSearchResults] = useState([]);
-    const [scrobbledIds, setScrobbledIds] = useState(new Set()); // State to track scrobbled songs
+    const [scrobbledIds, setScrobbledIds] = useState(new Set());
 
+    // --- Refs ---
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
     const prevIndexRef = useRef(state.currentIndex);
-    const nowPlayingIdRef = useRef(null); // Ref to track the current "Now Playing" song ID
-    
+    const nowPlayingIdRef = useRef(null);
+    // --- ADDED: Ref to prevent rapid repeat firing ---
+    const repeatOneTriggeredRef = useRef(null);
+
     useEffect(() => { stateRef.current = state; }, [state]);
-    
+
+    // --- Font Loading ---
     useEffect(() => {
         const fontLink = document.createElement('link');
         fontLink.href = 'https.googleapis.com/css2?family=Spinnaker&display=swap';
@@ -494,9 +503,9 @@ export default function App() {
         return () => { document.head.removeChild(fontLink); };
     }, []);
 
-    // --- Media Session API Integration ---
+    // --- Media Session API ---
     /* ... Media Session functions remain the same ... */
-        const updateMediaSession = useCallback((track, position, playing) => {
+    const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
                 navigator.mediaSession.metadata = new MediaMetadata({
@@ -517,12 +526,12 @@ export default function App() {
                     if ('setPositionState' in navigator.mediaSession) {
                         const duration = parseFloat(track.duration);
                         const pos = parseFloat(position);
-                        
+
                         if (!isNaN(duration) && !isNaN(pos) && duration > 0) {
                             const validDuration = Math.max(0, duration);
                             const validPosition = Math.max(0, Math.min(pos, validDuration));
                             const validRate = playing ? 1.0 : 0.0;
-                            
+
                             navigator.mediaSession.setPositionState({
                                 duration: validDuration,
                                 playbackRate: validRate,
@@ -580,26 +589,30 @@ export default function App() {
         }
     }, []);
 
-
     // --- Core State Refresh Logic ---
     /* ... refreshState function remains the same ... */
-        const refreshState = useCallback(async (forceUpdate = false) => {
+    const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
             return;
         }
-        
+
         try {
             const result = await callJukebox('get');
             const { status, playlist } = result;
-            
-            const newPlaylist = Array.isArray(playlist?.entry) 
-                ? playlist.entry 
+
+            const newPlaylist = Array.isArray(playlist?.entry)
+                ? playlist.entry
                 : (playlist?.entry ? [playlist.entry] : []);
-            
+
             setState(prevState => {
                 const currentTrack = newPlaylist[status.currentIndex || 0];
                 const prevTrack = prevState.playlist[prevState.currentIndex];
-                
+
+                // --- ADDED: Reset repeat trigger if track changed ---
+                if (currentTrack?.id !== prevTrack?.id) {
+                    repeatOneTriggeredRef.current = null;
+                }
+
                 return {
                     ...prevState,
                     playing: status.playing,
@@ -610,9 +623,11 @@ export default function App() {
                     lastStatusTs: Date.now(),
                     localTickStart: status.position,
                     endHandledForId: currentTrack?.id !== prevTrack?.id ? null : prevState.endHandledForId,
+                    // Persist repeatMode across refreshes
+                    repeatMode: prevState.repeatMode
                 };
             });
-            
+
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
         } catch (e) {
             if (e.message === 'Authentication failed' || e.message === 'Not authenticated') {
@@ -628,13 +643,15 @@ export default function App() {
 
     // --- Transport & Queue Actions ---
     /* ... skipTo, handleTransport, handleQueueAction remain the same ... */
-        const skipTo = useCallback(async (index, offsetSec = 0) => {
+    const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
-        
+
         commandInProgress.current = true;
         try {
             await callJukebox('skip', `&index=${index}&offset=${Math.max(0, Math.floor(offsetSec))}`);
+            // --- ADDED: Ensure repeat trigger is reset after manual skip ---
+            repeatOneTriggeredRef.current = null;
             await refreshState(true);
         } catch (e) {
             console.error(e);
@@ -645,7 +662,7 @@ export default function App() {
 
     const handleTransport = useCallback(async (action) => {
         const currentState = stateRef.current;
-        
+
         commandInProgress.current = true;
         try {
             if (action === 'play-pause') {
@@ -654,6 +671,7 @@ export default function App() {
                 setState(prev => ({ ...prev, playing: !prev.playing }));
             } else if (action === 'next') {
                 await callJukebox('skip', `&index=${currentState.currentIndex + 1}&offset=0`);
+                 repeatOneTriggeredRef.current = null; // Reset on skip
             } else if (action === 'previous') {
                 const restart = (currentState.position || 0) > 3;
                 if (restart) {
@@ -661,6 +679,7 @@ export default function App() {
                 } else {
                     await callJukebox('skip', `&index=${Math.max(0, currentState.currentIndex - 1)}&offset=0`);
                 }
+                 repeatOneTriggeredRef.current = null; // Reset on skip
             } else if (action === 'clear') {
                 if (!confirm('Clear the whole queue?')) {
                     commandInProgress.current = false;
@@ -680,7 +699,7 @@ export default function App() {
                 }
                 setStatusText(`Random song added: ${randomSong.title}!`);
             }
-            
+
             await refreshState(true);
             setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
         } catch (e) {
@@ -707,10 +726,18 @@ export default function App() {
         }
     }, [skipTo, refreshState]);
 
-    
+
+    // --- ADDED: Repeat Button Handler ---
+    const handleRepeatClick = useCallback(() => {
+        setState(prev => {
+            const nextMode = prev.repeatMode === 'off' ? 'all' : prev.repeatMode === 'all' ? 'one' : 'off';
+            return { ...prev, repeatMode: nextMode };
+        });
+    }, []);
+
     // --- Effects & Listeners ---
-    /* ... All useEffect hooks remain the same ... */
-        useEffect(() => {
+    /* ... Visibility, Media Session Setup, Initialization useEffects remain the same ... */
+    useEffect(() => {
         const handleVisibilityChange = () => {
             // Check if the page is NOT hidden (i.e., it just became visible)
             if (document.hidden === false && isAuthenticated) {
@@ -744,25 +771,25 @@ export default function App() {
     // Initialization - try to reconnect with saved credentials
     useEffect(() => {
         let mounted = true;
-        
+
         (async function init() {
             try {
                 const savedConfig = getConfig();
                 if (savedConfig.username) {
                     setConfigForm(savedConfig);
                     setStatusText('Reconnecting…');
-                    
+
                     const connected = await reconnect();
-                    
+
                     if (!mounted) return;
-                    
+
                     if (connected) {
                         setIsAuthenticated(true);
                         await refreshState(true);
-                        
+
                         const { playlist } = await callJukebox('get');
                         const currentPlaylist = Array.isArray(playlist.entry) ? playlist.entry : (playlist.entry ? [playlist.entry] : []);
-                        
+
                         if (mounted && currentPlaylist.length === 0) {
                             for (let i = 0; i < 3; i++) {
                                 if (!mounted) break;
@@ -772,7 +799,7 @@ export default function App() {
                                 await refreshState(true);
                             }
                         }
-                        
+
                         if (mounted) {
                             setStatusText('Ready');
                         }
@@ -791,91 +818,81 @@ export default function App() {
                 }
             }
         })();
-        
+
         return () => { mounted = false; };
     }, [refreshState]);
 
-    // *** FIX: MODIFIED POLLING LOOP ***
-    // Polling loop (and authoritative scrobble check)
+    // Polling loop & Scrobbling
+    /* ... Polling/Scrobble useEffect remains the same ... */
     useEffect(() => {
         if (!isAuthenticated) return;
-        
+
         const pollInterval = setInterval(async () => {
-            // *** FIX: Removed `if (document.hidden === false)` check ***
-            // This allows background polling to keep state and scrobble logic working.
             try {
                 await refreshState(false);
             } catch (e) {
                 console.error("Background poll refresh failed:", e);
-                // Don't stop the loop, just log the error
                 return;
             }
-            
-            // --- SCROBBLE LOGIC MOVED HERE ---
-            // Get the most recent state after refresh
+
+            // --- SCROBBLE LOGIC ---
             const currentState = stateRef.current;
             const tr = currentState.playlist[currentState.currentIndex];
-            
-            if (!tr) return; // Nothing to scrobble
-            
+
+            if (!tr) return;
+
             const dur = Math.max(0, tr.duration || 0);
-            const pos = currentState.position; // Use authoritative position
-            
-            // Check if song is eligible and hasn't been scrobbled yet
+            const pos = currentState.position;
+
             if (dur > 30 && !scrobbledIds.has(tr.id)) {
                 const isHalfway = pos >= dur / 2;
-                const isFourMinutes = pos >= 240; // 4 minutes
+                const isFourMinutes = pos >= 240;
 
                 if (isHalfway || isFourMinutes) {
                     if (DEBUG()) console.log(`Scrobbling (from poll): ${tr.title}`);
-                    scrobble(tr.id, true); // true for a full scrobble
-                    
-                    // Update scrobble state
+                    scrobble(tr.id, true);
                     setScrobbledIds(prev => new Set(prev).add(tr.id));
-                    
+
                     setStatusText(`Scrobbled: ${tr.title}`);
                     setTimeout(() => {
                         const latestState = stateRef.current;
-                        // Only set status if it hasn't been changed by something else
-                        if (statusText === `Scrobble: ${tr.title}`) {
+                         if (statusText === `Scrobbled: ${tr.title}`) {
                             setStatusText(latestState.playing ? '▶️ Playing' : '⏸️ Paused');
                         }
                     }, 3000);
                 }
             }
-            // --- END OF MOVED SCROBBLE LOGIC ---
+            // --- END SCROBBLE LOGIC ---
 
-        }, 2000); // Poll every 2 seconds
-        
+        }, 2000);
+
         return () => clearInterval(pollInterval);
-    }, [refreshState, isAuthenticated, scrobbledIds, statusText]); // Added dependencies
+    }, [refreshState, isAuthenticated, scrobbledIds, statusText]);
 
-    // *** FIX 2: UPDATED Auto-remove finished songs logic ***
+    // Auto-remove finished songs
+    /* ... Auto-remove useEffect remains the same ... */
     useEffect(() => {
         const prevIndex = prevIndexRef.current;
         const currentIndex = state.currentIndex;
-        
+
         // Check if the index has advanced AND we are not in 'one' repeat mode
-        if (currentIndex > prevIndex && state.repeatMode !== 'one' && state.playlist.length > 0) {
-            
+        // MODIFIED: Also check if repeatMode is NOT 'one'
+        if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
+
             (async () => {
                 try {
-                    // Create a list of all indexes that finished
                     const indexesToRemove = [];
                     for (let i = prevIndex; i < currentIndex; i++) {
                         indexesToRemove.push(i);
                     }
-                    
+
                     if (indexesToRemove.length > 0) {
-                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s).`);
-                        
-                        // We must remove them in REVERSE order
-                        // to not mess up the indexes of the tracks still in the queue.
+                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
+
                         for (const index of indexesToRemove.reverse()) {
                             await callJukebox('remove', `&index=${index}`);
                         }
-                        
-                        // After all removals, do one final refresh to sync state
+
                         await refreshState(true);
                     }
                 } catch (e) {
@@ -883,13 +900,13 @@ export default function App() {
                 }
             })();
         }
-        
-        // Always update the prevIndexRef *after* the logic
+
         prevIndexRef.current = currentIndex;
-        
-    }, [state.currentIndex, state.repeatMode, state.playlist.length, refreshState]);
+
+    }, [state.currentIndex, state.playlist.length, refreshState]); // Removed repeatMode dependency here, check happens via stateRef
 
     // "Now Playing" update effect
+    /* ... Now Playing useEffect remains the same ... */
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
         if (state.playing && currentTrack && nowPlayingIdRef.current !== currentTrack.id) {
@@ -900,46 +917,54 @@ export default function App() {
             nowPlayingIdRef.current = null;
         }
     }, [state.playing, state.currentIndex, state.playlist]);
-    
-    // *** FIX: MODIFIED Position Ticker ***
-    // Position ticker (for UI visual update only)
+
+
+    // --- MODIFIED: Position Ticker & Repeat Logic ---
     useEffect(() => {
         const tickInterval = setInterval(() => {
+            // Use ref to get the latest state without causing re-renders
             const currentState = stateRef.current;
-            // Only tick if the tab is visible and playing
-            if (document.hidden || !currentState.playing || currentState.seeking) {
+            const { playing, seeking, playlist, currentIndex, lastStatusTs, localTickStart, repeatMode } = currentState;
+
+            if (document.hidden || !playing || seeking || commandInProgress.current) {
                 return;
             }
 
-            const tr = currentState.playlist[currentState.currentIndex];
-            const dur = Math.max(0, tr?.duration || 0);
-            // Calculate visual-only position
-            const dt = (Date.now() - currentState.lastStatusTs) / 1000;
-            const pos = Math.min(dur, currentState.localTickStart + dt);
-            
-            setState(prev => {
-                // If the song has changed, reset the scrobbled set for the new song
-                // This is important for the *next* song's scrobble check
-                if (prev.playlist[prev.currentIndex]?.id !== tr?.id) {
-                    setScrobbledIds(new Set());
-                }
-                return { ...prev, position: pos };
-            });
-            
+            const tr = playlist[currentIndex];
+            if (!tr) return;
+
+            const dur = Math.max(0, tr.duration || 0);
+            const dt = (Date.now() - lastStatusTs) / 1000;
+            const pos = Math.min(dur, localTickStart + dt);
+
+            // Update visual position
+            setState(prev => ({ ...prev, position: pos }));
+
+            // --- ADDED: Repeat 'one' logic ---
+            // Check if repeat 'one' is active, track is near the end, and repeat hasn't been triggered for this ID yet
+            if (repeatMode === 'one' && dur > 1 && pos >= dur - 0.8 && repeatOneTriggeredRef.current !== tr.id) {
+                if (DEBUG()) console.log(`Repeat One Triggered for ${tr.title}`);
+                repeatOneTriggeredRef.current = tr.id; // Mark as triggered for this track instance
+                // Call skipTo without await to avoid blocking the interval,
+                // skipTo handles commandInProgress flag internally.
+                skipTo(currentIndex, 0);
+            }
+            // --- END Repeat 'one' logic ---
+
         }, 500); // UI ticks every 500ms
 
         return () => clearInterval(tickInterval);
-    }, []); // Empty dependency array, this effect runs once and manages its own state via refs
+    }, [skipTo]); // Added skipTo dependency
 
 
-    // --- Input Handlers (Volume, Seek, Search, Login) ---
-    /* ... handleVolumeChange, handleSeekInput, handleSeekChange, addSongFromSearch, handleConfigChange, handleLogin remain the same ... */
+    // --- Input Handlers ---
+    /* ... Volume, Seek, Search, Login handlers remain the same ... */
         const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
-        
+
         setState(prev => ({ ...prev, gain }));
-        
+
         try {
             await callJukebox('setGain', `&gain=${gain}`);
         } catch (e) {
@@ -954,27 +979,27 @@ export default function App() {
             const dur = Math.max(0, tr?.duration || 0);
             const fill = Number(e.target.value);
             const pos = (fill / 1000) * dur;
-            
-            return { 
-                ...prevState, 
-                seeking: true, 
+
+            return {
+                ...prevState,
+                seeking: true,
                 position: pos,
                 localTickStart: pos,
                 lastStatusTs: Date.now(),
             };
         });
     }, []);
-    
+
     const handleSeekChange = useCallback(async (e) => {
         const currentState = stateRef.current;
         const tr = currentState.playlist[currentState.currentIndex];
         const dur = Math.max(0, tr?.duration || 0);
         const pos = (Number(e.target.value) / 1000) * dur;
-        
+
         setState(prev => ({ ...prev, seeking: false }));
         await skipTo(currentState.currentIndex, pos);
     }, [skipTo]);
-    
+
     // Search Logic
     useEffect(() => {
         let searchTimer;
@@ -998,7 +1023,7 @@ export default function App() {
     const addSongFromSearch = useCallback(async (id) => {
         const currentState = stateRef.current;
         commandInProgress.current = true;
-        
+
         try {
             await callJukebox('add', `&id=${encodeURIComponent(id)}`);
             if (!currentState.playing && currentState.playlist.length === 0) {
@@ -1013,12 +1038,12 @@ export default function App() {
             commandInProgress.current = false;
         }
     }, [refreshState]);
-    
+
     // Login Logic
     const handleConfigChange = useCallback((e) => {
         setConfigForm(f => ({ ...f, [e.target.id]: e.target.value }));
     }, []);
-    
+
     const handleLogin = useCallback(async () => {
         const { serverUrl, username, password } = configForm;
         if (!username || !password) { setStatusText('Please enter username and password'); return; }
@@ -1041,6 +1066,7 @@ export default function App() {
 
 
     // --- DND-KIT SENSORS ---
+    /* ... Sensors setup remains the same ... */
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -1048,10 +1074,8 @@ export default function App() {
         })
     );
 
-    // --- ###################################### ---
-    // --- THIS IS THE MODIFIED FUNCTION WITH THE ---
-    // ---    SEAMLESS PLAYBACK FIX (ATTEMPT 3)   ---
-    // --- ###################################### ---
+    // --- DND-KIT Drag End Handler ---
+    /* ... handleDragEnd (Attempt 3) remains the same ... */
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
@@ -1112,7 +1136,7 @@ export default function App() {
                 const newPlayingIndex = currentTrackId
                     ? newPlaylist.findIndex(song => song.id === currentTrackId)
                     : -1;
-                
+
                 if (DEBUG()) console.log(`[DnD V3] Original track new index: ${newPlayingIndex}`);
 
                 if (newPlayingIndex !== -1) {
@@ -1146,20 +1170,34 @@ export default function App() {
                  if (DEBUG()) console.log(`[DnD V3] Drag end handler finished`);
             }
         }
-    }, [refreshState]); // refreshState dependency is correct
+    }, [refreshState]);
+
 
     // --- Derived State ---
     const currentTrack = state.playlist[state.currentIndex];
-    
+
     const seekValue = useMemo(() => {
         const tr = state.playlist[state.currentIndex];
         const dur = Math.max(0, tr?.duration || 0);
         const pos = Math.max(0, Math.min(dur, state.position));
         return dur ? Math.round((pos / dur) * 1000) : 0;
     }, [state.position, state.currentIndex, state.playlist]);
-    
+
     const seekFillStyle = useMemo(() => ({'--seek-fill': `${(seekValue / 10).toFixed(1)}%`}), [seekValue]);
     const volFillStyle = useMemo(() => ({'--vol-fill': `${Math.round(state.gain * 100)}%`}), [state.gain]);
+
+    // --- ADDED: Repeat button UI state ---
+    const repeatButtonText = useMemo(() => {
+        if (state.repeatMode === 'one') return '🔂1';
+        if (state.repeatMode === 'all') return '🔂';
+        return '🔁';
+    }, [state.repeatMode]);
+    const repeatButtonTitle = useMemo(() => {
+        if (state.repeatMode === 'one') return 'Repeat One';
+        if (state.repeatMode === 'all') return 'Repeat All';
+        return 'Repeat Off';
+    }, [state.repeatMode]);
+
 
     // --- RENDER ---
     return (
@@ -1167,11 +1205,11 @@ export default function App() {
             <style>{styles}</style>
             <div className="player-shell">
                 <aside className="cover-card">
+                    {/* ... Cover card content ... */}
                     <img className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 900)} />
                     <div className="meta">
                         <div className="title">{currentTrack?.title || 'Nothing playing'}</div>
-                        
-                        {/* --- ADDED CODE --- */}
+
                         {currentTrack && (currentTrack.suffix || currentTrack.bitRate) && (
                             <div className="format-info">
                                 {currentTrack.suffix || ''}
@@ -1179,8 +1217,7 @@ export default function App() {
                                 {currentTrack.bitRate ? `${currentTrack.bitRate} kbps` : ''}
                             </div>
                         )}
-                        {/* --- END ADDED CODE --- */}
-                        
+
                         <div className="artist">{currentTrack?.artist || '—'}</div>
                         <div className="album">{currentTrack?.album || ''}&nbsp;</div>
                     </div>
@@ -1191,20 +1228,30 @@ export default function App() {
                         <div id="statusText">{statusText}</div>
                         <div className="small">Queue: <span id="queueCount">{state.playlist.length}</span> tracks</div>
                     </div>
+                    {/* --- MODIFIED: Added Repeat button to controls --- */}
                     <div className="controls">
                       <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
                       <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
                         {state.playing ? '⏸' : '▶'}
                       </button>
                       <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
+                      {/* Repeat Button */}
+                      <button
+                        className={`btn repeat ${state.repeatMode !== 'off' ? 'active' : ''}`}
+                        title={repeatButtonTitle}
+                        onClick={handleRepeatClick}
+                       >
+                        {repeatButtonText}
+                       </button>
                       <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
                       <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
                     </div>
 
                     <div className="progress">
-                        <div className="time">{fmtTime(state.position)}</div>
-                        <input 
-                            className="seek" type="range" min="0" max="1000" 
+                        {/* ... Progress bar content ... */}
+                         <div className="time">{fmtTime(state.position)}</div>
+                        <input
+                            className="seek" type="range" min="0" max="1000"
                             value={seekValue} style={seekFillStyle}
                             onChange={handleSeekChange} onInput={handleSeekInput}
                             disabled={!isAuthenticated}
@@ -1213,11 +1260,12 @@ export default function App() {
                     </div>
 
                     <div className="vol">
-                        <div className="vol-row">
+                         {/* ... Volume control content ... */}
+                         <div className="vol-row">
                             <div title="Volume">🔊</div>
-                            <input 
+                            <input
                                 id="volume"
-                                type="range" min="0" max="100" 
+                                type="range" min="0" max="100"
                                 value={Math.round(state.gain * 100)}
                                 style={volFillStyle}
                                 onChange={handleVolumeChange}
@@ -1231,21 +1279,21 @@ export default function App() {
                 <aside className="side-card">
                     <h3>Queue</h3>
                     
-                    {/* --- QUEUE LIST WRAPPED IN DND-KIT CONTEXTS --- */}
+                    {/* --- DND Queue List --- */}
                     <DndContext 
                         sensors={sensors}
                         collisionDetection={closestCenter}
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext 
-                            items={state.playlist.map(s => s.id)} // Provide list of unique IDs
+                            items={state.playlist.map(s => s.id)} 
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
                                 {state.playlist.map((song, index) => (
                                     <JukeboxQueueItem 
-                                        key={song.id} // Key must be stable and match the ID
-                                        id={song.id}  // Pass ID to useSortable
+                                        key={song.id} 
+                                        id={song.id}  
                                         song={song}
                                         index={index} 
                                         currentIndex={state.currentIndex}
@@ -1255,10 +1303,10 @@ export default function App() {
                             </div>
                         </SortableContext>
                     </DndContext>
-                    {/* --- END OF QUEUE LIST --- */}
                     
-                    <div className="search-box">
-                        <input 
+                     {/* ... Search and Config sections ... */}
+                     <div className="search-box">
+                        <input
                             placeholder="Search songs to add…"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -1277,7 +1325,7 @@ export default function App() {
                             ))}
                         </div>
                     </div>
-                    
+
                     <div className="config">
                         <div className="row">
                             <input id="serverUrl" placeholder="Server URL" value={configForm.serverUrl || ''} onChange={handleConfigChange} disabled={isAuthenticated}/>
@@ -1288,8 +1336,8 @@ export default function App() {
                             </button>
                         </div>
                         <div className="small">
-                            {isAuthenticated 
-                                ? '✓ Connected. Your password is never stored.' 
+                            {isAuthenticated
+                                ? '✓ Connected. Your password is never stored.'
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
                         </div>
                     </div>
