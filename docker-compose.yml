@@ -21,6 +21,8 @@ services:
       - /big/Muz:/music:ro
       - /nvme1/navidrome:/data
       - ./navidrome.toml:/data/navidrome.toml:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     devices:
       - /dev/snd:/dev/snd
     group_add:
