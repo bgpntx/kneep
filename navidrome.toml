@@ -22,7 +22,7 @@ MPVPath = "/usr/bin/mpv"
 
 # Командний шаблон MPV — як саме Navidrome викликатиме mpv
 # %d — аудіо пристрій, %f — файл (шлях), %s — IPC сервер (sockets)
-MPVCmdTemplate = "mpv --no-video --audio-device=%d --input-ipc-server=%s %f"
+MPVCmdTemplate = "mpv --af=loudnorm --no-video --audio-device=%d --input-ipc-server=%s %f"
 
 # Інші опції
 SessionTimeout = "48h"
