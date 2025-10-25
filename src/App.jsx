@@ -1,4 +1,4 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat
+// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat fine :)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 // --- DND-KIT IMPORTS ---
 import {
