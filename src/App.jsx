@@ -1,4 +1,4 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat fine :)
+// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat fine
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 // --- DND-KIT IMPORTS ---
 import {
@@ -625,6 +625,40 @@ export default function App() {
 
         return () => { mounted = false; };
     }, [refreshState]);
+
+// Auto-remove finished songs
+useEffect(() => {
+    const prevIndex = prevIndexRef.current;
+    const currentIndex = state.currentIndex;
+
+    // Check if the index has advanced AND we are not in 'one' repeat mode
+    if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
+
+        (async () => {
+            try {
+                const indexesToRemove = [];
+                for (let i = prevIndex; i < currentIndex; i++) {
+                    indexesToRemove.push(i);
+                }
+
+                if (indexesToRemove.length > 0) {
+                    if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
+
+                    for (const index of indexesToRemove.reverse()) {
+                        await callJukebox('remove', `&index=${index}`);
+                    }
+
+                    await refreshState(true);
+                }
+            } catch (e) {
+                console.error('Failed to auto-remove finished song(s):', e);
+            }
+        })();
+    }
+
+    prevIndexRef.current = currentIndex;
+
+}, [state.currentIndex, state.playlist.length, refreshState]);
 
     // Polling loop & Scrobbling
     useEffect(() => {
