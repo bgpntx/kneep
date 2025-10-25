@@ -383,10 +383,9 @@ export default function App() {
     }, []);
 
     // --- Core State Refresh Logic ---
-    /* ... refreshState function remains the same ... */
     const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
-            return;
+            return null; // Return null if skipped
         }
 
         try {
@@ -396,9 +395,11 @@ export default function App() {
             const newPlaylist = Array.isArray(playlist?.entry)
                 ? playlist.entry
                 : (playlist?.entry ? [playlist.entry] : []);
+            
+            // Get track info *before* setState
+            const currentTrack = newPlaylist[status.currentIndex || 0];
 
             setState(prevState => {
-                const currentTrack = newPlaylist[status.currentIndex || 0];
                 const prevTrack = prevState.playlist[prevState.currentIndex];
 
                 // --- ADDED: Reset repeat trigger if track changed ---
@@ -416,12 +417,21 @@ export default function App() {
                     lastStatusTs: Date.now(),
                     localTickStart: status.position,
                     endHandledForId: currentTrack?.id !== prevTrack?.id ? null : prevState.endHandledForId,
-                    // Persist repeatMode across refreshes
                     repeatMode: prevState.repeatMode
                 };
             });
 
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
+
+            // --- FIX: Return the fresh, relevant data ---
+            return {
+                trackId: currentTrack?.id,
+                title: currentTrack?.title,
+                duration: currentTrack?.duration || 0,
+                position: status.position,
+                playing: status.playing
+            };
+
         } catch (e) {
             if (e.message === 'Authentication failed' || e.message === 'Not authenticated') {
                 setIsAuthenticated(false);
@@ -430,8 +440,9 @@ export default function App() {
                 setStatusText(`Error: ${e.message}`);
             }
             console.error('Refresh failed:', e);
+            return null; // Return null on failure
         }
-    }, []);
+    }, []); // <-- This empty array is fine
 
 
     // --- Transport & Queue Actions ---
@@ -616,42 +627,59 @@ export default function App() {
     }, [refreshState]);
 
     // Polling loop & Scrobbling
-    /* ... Polling/Scrobble useEffect remains the same ... */
     useEffect(() => {
         if (!isAuthenticated) return;
 
         const pollInterval = setInterval(async () => {
+            
+            // --- MODIFIED ---
+            let freshData;
             try {
-                await refreshState(false);
+                // 1. Get fresh data *directly* from the refresh.
+                freshData = await refreshState(false);
             } catch (e) {
                 console.error("Background poll refresh failed:", e);
                 return;
             }
 
+            // 2. Check if we got valid data back
+            if (!freshData || !freshData.trackId) {
+                // This can happen if refreshState failed or was skipped
+                return;
+            }
+            // --- END MODIFIED ---
+
+
             // --- SCROBBLE LOGIC ---
-            const currentState = stateRef.current;
-            const tr = currentState.playlist[currentState.currentIndex];
+            // 3. Use the fresh data, not the stale stateRef
+            const { trackId, title, duration, position, playing } = freshData;
 
-            if (!tr) return;
+            const dur = Math.max(0, duration || 0);
+            const pos = Math.max(0, position || 0);
 
-            const dur = Math.max(0, tr.duration || 0);
-            const pos = currentState.position;
-
-            if (dur > 30 && !scrobbledIds.has(tr.id)) {
+            // 4. Use scrobbledIds from state (this is fine, it's read *before* set)
+            if (dur > 30 && !scrobbledIds.has(trackId)) {
                 const isHalfway = pos >= dur / 2;
                 const isFourMinutes = pos >= 240;
 
                 if (isHalfway || isFourMinutes) {
-                    if (DEBUG()) console.log(`Scrobbling (from poll): ${tr.title}`);
-                    scrobble(tr.id, true);
-                    setScrobbledIds(prev => new Set(prev).add(tr.id));
+                    if (DEBUG()) console.log(`Scrobbling (from poll): ${title}`);
+                    scrobble(trackId, true);
+                    
+                    // 5. This update is correct.
+                    setScrobbledIds(prev => new Set(prev).add(trackId));
 
-                    setStatusText(`Scrobbled: ${tr.title}`);
+                    const scrobbleMsg = `Scrobbled: ${title}`;
+                    setStatusText(scrobbleMsg);
+                    
                     setTimeout(() => {
-                        const latestState = stateRef.current;
-                         if (statusText === `Scrobbled: ${tr.title}`) {
-                            setStatusText(latestState.playing ? '▶️ Playing' : '⏸️ Paused');
-                        }
+                        setStatusText((currentStatusText) => {
+                            if (currentStatusText === scrobbleMsg) {
+                                // 6. Use the fresh 'playing' status we already have!
+                                return playing ? '▶️ Playing' : '⏸️ Paused';
+                            }
+                            return currentStatusText;
+                        });
                     }, 3000);
                 }
             }
@@ -660,46 +688,11 @@ export default function App() {
         }, 2000);
 
         return () => clearInterval(pollInterval);
-    }, [refreshState, isAuthenticated, scrobbledIds, statusText]);
+    // This dependency array is correct
+    }, [refreshState, isAuthenticated, scrobbledIds]);
 
-    // Auto-remove finished songs
-    /* ... Auto-remove useEffect remains the same ... */
-    useEffect(() => {
-        const prevIndex = prevIndexRef.current;
-        const currentIndex = state.currentIndex;
-
-        // Check if the index has advanced AND we are not in 'one' repeat mode
-        // MODIFIED: Also check if repeatMode is NOT 'one'
-        if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
-
-            (async () => {
-                try {
-                    const indexesToRemove = [];
-                    for (let i = prevIndex; i < currentIndex; i++) {
-                        indexesToRemove.push(i);
-                    }
-
-                    if (indexesToRemove.length > 0) {
-                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
-
-                        for (const index of indexesToRemove.reverse()) {
-                            await callJukebox('remove', `&index=${index}`);
-                        }
-
-                        await refreshState(true);
-                    }
-                } catch (e) {
-                    console.error('Failed to auto-remove finished song(s):', e);
-                }
-            })();
-        }
-
-        prevIndexRef.current = currentIndex;
-
-    }, [state.currentIndex, state.playlist.length, refreshState]); // Removed repeatMode dependency here, check happens via stateRef
-
+    
     // "Now Playing" update effect
-    /* ... Now Playing useEffect remains the same ... */
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
         if (state.playing && currentTrack && nowPlayingIdRef.current !== currentTrack.id) {
