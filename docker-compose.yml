@@ -13,7 +13,9 @@ services:
       ND_LOGLEVEL: debug
       ND_JUKEBOX_ENABLED: "true"
       ND_JUKEBOX_ADMINONLY: "false"
-      ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' ${INPUT}"
+      ND_MPV_CMD_TEMPLATE: "mpv --no-video --af=loudnorm --audio-device='alsa/sysdefault:CARD=U24XL' ${INPUT}"
+      ND_LASTFM_APIKEY: ${LASTFM_API_KEY}
+      ND_LASTFM_SECRET: ${LASTFM_SECRET}
     # Only expose internally to docker network, not to host
     expose:
       - "4533"
