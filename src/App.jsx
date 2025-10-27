@@ -530,6 +530,33 @@ export default function App() {
         }
     }, [skipTo, refreshState]);
 
+    // --- ADDED: checkAndScrobble callback for polling and visibilitychange ---
+    const checkAndScrobble = useCallback((freshData) => {
+        if (!freshData || !freshData.trackId) return;
+        const { trackId, title, duration, position, playing } = freshData;
+        const dur = Math.max(0, duration || 0);
+        const pos = Math.max(0, position || 0);
+        if (dur > 30 && !scrobbledIds.has(trackId)) {
+            const isHalfway = pos >= dur / 2;
+            const isFourMinutes = pos >= 240;
+            if (isHalfway || isFourMinutes) {
+                if (DEBUG()) console.log(`Scrobbling (from checkAndScrobble): ${title}`);
+                scrobble(trackId, true);
+                setScrobbledIds(prev => new Set(prev).add(trackId));
+                const scrobbleMsg = `Scrobbled: ${title}`;
+                setStatusText(scrobbleMsg);
+                setTimeout(() => {
+                    setStatusText((currentStatusText) => {
+                        if (currentStatusText === scrobbleMsg) {
+                            return playing ? '▶️ Playing' : '⏸️ Paused';
+                        }
+                        return currentStatusText;
+                    });
+                }, 3000);
+            }
+        }
+    }, [scrobbledIds]);
+
 
     // --- ADDED: Repeat Button Handler ---
     const handleRepeatClick = useCallback(() => {
@@ -542,24 +569,19 @@ export default function App() {
     // --- Effects & Listeners ---
     /* ... Visibility, Media Session Setup, Initialization useEffects remain the same ... */
     useEffect(() => {
-        const handleVisibilityChange = () => {
-            // Check if the page is NOT hidden (i.e., it just became visible)
+        const handleVisibilityChange = async () => {
             if (document.hidden === false && isAuthenticated) {
                 if (DEBUG()) console.log('Page became visible, forcing state refresh.');
-                // Force a refresh, bypassing the 'commandInProgress' check
-                // because the state is guaranteed to be stale.
-                refreshState(true);
+                // Force a refresh, bypassing 'commandInProgress'
+                const freshData = await refreshState(true);
+                checkAndScrobble(freshData);
             }
         };
-
-        // Add the event listener when the component mounts
         document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Clean up the event listener when the component unmounts
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [refreshState, isAuthenticated]); // Add refreshState and isAuthenticated as dependencies
+    }, [refreshState, isAuthenticated, checkAndScrobble]);
 
     useEffect(() => {
         setupMediaSessionHandlers(handleTransport);
@@ -660,70 +682,21 @@ useEffect(() => {
 
 }, [state.currentIndex, state.playlist.length, refreshState]);
 
-    // Polling loop & Scrobbling
+    // Polling loop & Scrobbling (refactored)
     useEffect(() => {
         if (!isAuthenticated) return;
-
         const pollInterval = setInterval(async () => {
-            
-            // --- MODIFIED ---
             let freshData;
             try {
-                // 1. Get fresh data *directly* from the refresh.
                 freshData = await refreshState(false);
             } catch (e) {
                 console.error("Background poll refresh failed:", e);
                 return;
             }
-
-            // 2. Check if we got valid data back
-            if (!freshData || !freshData.trackId) {
-                // This can happen if refreshState failed or was skipped
-                return;
-            }
-            // --- END MODIFIED ---
-
-
-            // --- SCROBBLE LOGIC ---
-            // 3. Use the fresh data, not the stale stateRef
-            const { trackId, title, duration, position, playing } = freshData;
-
-            const dur = Math.max(0, duration || 0);
-            const pos = Math.max(0, position || 0);
-
-            // 4. Use scrobbledIds from state (this is fine, it's read *before* set)
-            if (dur > 30 && !scrobbledIds.has(trackId)) {
-                const isHalfway = pos >= dur / 2;
-                const isFourMinutes = pos >= 240;
-
-                if (isHalfway || isFourMinutes) {
-                    if (DEBUG()) console.log(`Scrobbling (from poll): ${title}`);
-                    scrobble(trackId, true);
-                    
-                    // 5. This update is correct.
-                    setScrobbledIds(prev => new Set(prev).add(trackId));
-
-                    const scrobbleMsg = `Scrobbled: ${title}`;
-                    setStatusText(scrobbleMsg);
-                    
-                    setTimeout(() => {
-                        setStatusText((currentStatusText) => {
-                            if (currentStatusText === scrobbleMsg) {
-                                // 6. Use the fresh 'playing' status we already have!
-                                return playing ? '▶️ Playing' : '⏸️ Paused';
-                            }
-                            return currentStatusText;
-                        });
-                    }, 3000);
-                }
-            }
-            // --- END SCROBBLE LOGIC ---
-
+            checkAndScrobble(freshData);
         }, 2000);
-
         return () => clearInterval(pollInterval);
-    // This dependency array is correct
-    }, [refreshState, isAuthenticated, scrobbledIds]);
+    }, [refreshState, isAuthenticated, checkAndScrobble]);
 
     
     // "Now Playing" update effect
