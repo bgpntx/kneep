@@ -1,4 +1,4 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat fine
+// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat - FIXED SCROBBLING
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 // --- DND-KIT IMPORTS ---
 import {
@@ -20,7 +20,6 @@ import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
 // --- Jukebox API Logic ---
-// ... (md5, API calls, etc. - functions remain the same) ...
 const API_VERSION = '1.16.1';
 const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
 
@@ -206,14 +205,12 @@ const initialState = {
     position: 0,
     lastStatusTs: 0,
     localTickStart: 0,
-    // --- ADDED: repeatMode to initial state ---
-    repeatMode: 'off', // 'off', 'all', 'one'
+    repeatMode: 'off',
     seeking: false,
     endHandledForId: null,
 };
 
 // --- Component for a single sortable queue item ---
-/* ... JukeboxQueueItem component remains the same ... */
 function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const isCurrent = index === currentIndex;
 
@@ -224,12 +221,12 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: id }); // Use the song ID as the unique ID
+    } = useSortable({ id: id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        touchAction: 'none', // Recommended for pointer sensors
+        touchAction: 'none',
     };
 
     const className = `qitem${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`;
@@ -239,7 +236,7 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
             ref={setNodeRef}
             style={style}
             {...attributes}
-            {...listeners} // Attach listeners to the whole item
+            {...listeners}
             className={className}
             data-index={index}
         >
@@ -249,7 +246,6 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
                 <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
             </div>
             <div className="qi-actions">
-                {/* Add onPointerDown to stop drag from starting on buttons */}
                 <button
                     title="Play here"
                     className="btn"
@@ -282,22 +278,27 @@ export default function App() {
     const stateRef = useRef(state);
     const prevIndexRef = useRef(state.currentIndex);
     const nowPlayingIdRef = useRef(null);
-    // --- ADDED: Ref to prevent rapid repeat firing ---
     const repeatOneTriggeredRef = useRef(null);
+    // --- FIX: Ref for scrobbled IDs to avoid effect dependency issues ---
+    const scrobbledIdsRef = useRef(new Set());
 
     useEffect(() => { stateRef.current = state; }, [state]);
+    
+    // Sync scrobbledIds ref with state
+    useEffect(() => {
+        scrobbledIdsRef.current = scrobbledIds;
+    }, [scrobbledIds]);
 
     // --- Font Loading ---
     useEffect(() => {
         const fontLink = document.createElement('link');
-        fontLink.href = 'https.googleapis.com/css2?family=Spinnaker&display=swap';
+        fontLink.href = 'https://googleapis.com/css2?family=Spinnaker&display=swap';
         fontLink.rel = 'stylesheet';
         document.head.appendChild(fontLink);
         return () => { document.head.removeChild(fontLink); };
     }, []);
 
     // --- Media Session API ---
-    /* ... Media Session functions remain the same ... */
     const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
@@ -385,7 +386,7 @@ export default function App() {
     // --- Core State Refresh Logic ---
     const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
-            return null; // Return null if skipped
+            return null;
         }
 
         try {
@@ -396,13 +397,11 @@ export default function App() {
                 ? playlist.entry
                 : (playlist?.entry ? [playlist.entry] : []);
             
-            // Get track info *before* setState
             const currentTrack = newPlaylist[status.currentIndex || 0];
 
             setState(prevState => {
                 const prevTrack = prevState.playlist[prevState.currentIndex];
 
-                // --- ADDED: Reset repeat trigger if track changed ---
                 if (currentTrack?.id !== prevTrack?.id) {
                     repeatOneTriggeredRef.current = null;
                 }
@@ -423,7 +422,6 @@ export default function App() {
 
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
 
-            // --- FIX: Return the fresh, relevant data ---
             return {
                 trackId: currentTrack?.id,
                 title: currentTrack?.title,
@@ -440,13 +438,44 @@ export default function App() {
                 setStatusText(`Error: ${e.message}`);
             }
             console.error('Refresh failed:', e);
-            return null; // Return null on failure
+            return null;
         }
-    }, []); // <-- This empty array is fine
+    }, []);
 
+    // --- FIX: Reusable scrobble checking function ---
+    const checkAndScrobble = useCallback(async (freshData) => {
+        if (!freshData || !freshData.trackId) return;
+
+        const { trackId, title, duration, position, playing } = freshData;
+        const dur = Math.max(0, duration || 0);
+        const pos = Math.max(0, position || 0);
+
+        if (dur > 30 && !scrobbledIdsRef.current.has(trackId)) {
+            const isHalfway = pos >= dur / 2;
+            const isFourMinutes = pos >= 240;
+
+            if (isHalfway || isFourMinutes) {
+                if (DEBUG()) console.log(`Scrobbling: ${title} (pos=${pos.toFixed(1)}s, dur=${dur}s, halfway=${isHalfway}, 4min=${isFourMinutes})`);
+                await scrobble(trackId, true);
+                
+                setScrobbledIds(prev => new Set(prev).add(trackId));
+
+                const scrobbleMsg = `Scrobbled: ${title}`;
+                setStatusText(scrobbleMsg);
+                
+                setTimeout(() => {
+                    setStatusText((currentStatusText) => {
+                        if (currentStatusText === scrobbleMsg) {
+                            return playing ? '▶️ Playing' : '⏸️ Paused';
+                        }
+                        return currentStatusText;
+                    });
+                }, 3000);
+            }
+        }
+    }, []);
 
     // --- Transport & Queue Actions ---
-    /* ... skipTo, handleTransport, handleQueueAction remain the same ... */
     const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
@@ -454,7 +483,6 @@ export default function App() {
         commandInProgress.current = true;
         try {
             await callJukebox('skip', `&index=${index}&offset=${Math.max(0, Math.floor(offsetSec))}`);
-            // --- ADDED: Ensure repeat trigger is reset after manual skip ---
             repeatOneTriggeredRef.current = null;
             await refreshState(true);
         } catch (e) {
@@ -475,7 +503,7 @@ export default function App() {
                 setState(prev => ({ ...prev, playing: !prev.playing }));
             } else if (action === 'next') {
                 await callJukebox('skip', `&index=${currentState.currentIndex + 1}&offset=0`);
-                 repeatOneTriggeredRef.current = null; // Reset on skip
+                 repeatOneTriggeredRef.current = null;
             } else if (action === 'previous') {
                 const restart = (currentState.position || 0) > 3;
                 if (restart) {
@@ -483,7 +511,7 @@ export default function App() {
                 } else {
                     await callJukebox('skip', `&index=${Math.max(0, currentState.currentIndex - 1)}&offset=0`);
                 }
-                 repeatOneTriggeredRef.current = null; // Reset on skip
+                 repeatOneTriggeredRef.current = null;
             } else if (action === 'clear') {
                 if (!confirm('Clear the whole queue?')) {
                     commandInProgress.current = false;
@@ -530,35 +558,6 @@ export default function App() {
         }
     }, [skipTo, refreshState]);
 
-    // --- ADDED: checkAndScrobble callback for polling and visibilitychange ---
-    const checkAndScrobble = useCallback((freshData) => {
-        if (!freshData || !freshData.trackId) return;
-        const { trackId, title, duration, position, playing } = freshData;
-        const dur = Math.max(0, duration || 0);
-        const pos = Math.max(0, position || 0);
-        if (dur > 30 && !scrobbledIds.has(trackId)) {
-            const isHalfway = pos >= dur / 2;
-            const isFourMinutes = pos >= 240;
-            if (isHalfway || isFourMinutes) {
-                if (DEBUG()) console.log(`Scrobbling (from checkAndScrobble): ${title}`);
-                scrobble(trackId, true);
-                setScrobbledIds(prev => new Set(prev).add(trackId));
-                const scrobbleMsg = `Scrobbled: ${title}`;
-                setStatusText(scrobbleMsg);
-                setTimeout(() => {
-                    setStatusText((currentStatusText) => {
-                        if (currentStatusText === scrobbleMsg) {
-                            return playing ? '▶️ Playing' : '⏸️ Paused';
-                        }
-                        return currentStatusText;
-                    });
-                }, 3000);
-            }
-        }
-    }, [scrobbledIds]);
-
-
-    // --- ADDED: Repeat Button Handler ---
     const handleRepeatClick = useCallback(() => {
         setState(prev => {
             const nextMode = prev.repeatMode === 'off' ? 'all' : prev.repeatMode === 'all' ? 'one' : 'off';
@@ -566,18 +565,19 @@ export default function App() {
         });
     }, []);
 
-    // --- Effects & Listeners ---
-    /* ... Visibility, Media Session Setup, Initialization useEffects remain the same ... */
+    // --- FIX: Visibility change handler with scrobble check ---
     useEffect(() => {
         const handleVisibilityChange = async () => {
             if (document.hidden === false && isAuthenticated) {
-                if (DEBUG()) console.log('Page became visible, forcing state refresh.');
-                // Force a refresh, bypassing 'commandInProgress'
+                if (DEBUG()) console.log('Page became visible, forcing state refresh and checking scrobbles.');
+                
                 const freshData = await refreshState(true);
-                checkAndScrobble(freshData);
+                await checkAndScrobble(freshData);
             }
         };
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
@@ -594,7 +594,7 @@ export default function App() {
         }
     }, [state.currentIndex, state.playlist, state.position, state.playing, updateMediaSession]);
 
-    // Initialization - try to reconnect with saved credentials
+    // Initialization
     useEffect(() => {
         let mounted = true;
 
@@ -648,43 +648,43 @@ export default function App() {
         return () => { mounted = false; };
     }, [refreshState]);
 
-// Auto-remove finished songs
-useEffect(() => {
-    const prevIndex = prevIndexRef.current;
-    const currentIndex = state.currentIndex;
+    // Auto-remove finished songs
+    useEffect(() => {
+        const prevIndex = prevIndexRef.current;
+        const currentIndex = state.currentIndex;
 
-    // Check if the index has advanced AND we are not in 'one' repeat mode
-    if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
+        if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
 
-        (async () => {
-            try {
-                const indexesToRemove = [];
-                for (let i = prevIndex; i < currentIndex; i++) {
-                    indexesToRemove.push(i);
-                }
-
-                if (indexesToRemove.length > 0) {
-                    if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
-
-                    for (const index of indexesToRemove.reverse()) {
-                        await callJukebox('remove', `&index=${index}`);
+            (async () => {
+                try {
+                    const indexesToRemove = [];
+                    for (let i = prevIndex; i < currentIndex; i++) {
+                        indexesToRemove.push(i);
                     }
 
-                    await refreshState(true);
+                    if (indexesToRemove.length > 0) {
+                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
+
+                        for (const index of indexesToRemove.reverse()) {
+                            await callJukebox('remove', `&index=${index}`);
+                        }
+
+                        await refreshState(true);
+                    }
+                } catch (e) {
+                    console.error('Failed to auto-remove finished song(s):', e);
                 }
-            } catch (e) {
-                console.error('Failed to auto-remove finished song(s):', e);
-            }
-        })();
-    }
+            })();
+        }
 
-    prevIndexRef.current = currentIndex;
+        prevIndexRef.current = currentIndex;
 
-}, [state.currentIndex, state.playlist.length, refreshState]);
+    }, [state.currentIndex, state.playlist.length, refreshState]);
 
-    // Polling loop & Scrobbling (refactored)
+    // --- FIX: Polling loop with scrobble checking ---
     useEffect(() => {
         if (!isAuthenticated) return;
+
         const pollInterval = setInterval(async () => {
             let freshData;
             try {
@@ -693,17 +693,18 @@ useEffect(() => {
                 console.error("Background poll refresh failed:", e);
                 return;
             }
-            checkAndScrobble(freshData);
+
+            await checkAndScrobble(freshData);
         }, 2000);
+
         return () => clearInterval(pollInterval);
     }, [refreshState, isAuthenticated, checkAndScrobble]);
 
-    
     // "Now Playing" update effect
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
         if (state.playing && currentTrack && nowPlayingIdRef.current !== currentTrack.id) {
-            scrobble(currentTrack.id, false); // false for "now playing"
+            scrobble(currentTrack.id, false);
             nowPlayingIdRef.current = currentTrack.id;
         }
         if (!state.playing) {
@@ -711,11 +712,9 @@ useEffect(() => {
         }
     }, [state.playing, state.currentIndex, state.playlist]);
 
-
-    // --- MODIFIED: Position Ticker & Repeat Logic ---
+    // Position Ticker & Repeat Logic
     useEffect(() => {
         const tickInterval = setInterval(() => {
-            // Use ref to get the latest state without causing re-renders
             const currentState = stateRef.current;
             const { playing, seeking, playlist, currentIndex, lastStatusTs, localTickStart, repeatMode } = currentState;
 
@@ -730,29 +729,21 @@ useEffect(() => {
             const dt = (Date.now() - lastStatusTs) / 1000;
             const pos = Math.min(dur, localTickStart + dt);
 
-            // Update visual position
             setState(prev => ({ ...prev, position: pos }));
 
-            // --- ADDED: Repeat 'one' logic ---
-            // Check if repeat 'one' is active, track is near the end, and repeat hasn't been triggered for this ID yet
             if (repeatMode === 'one' && dur > 1 && pos >= dur - 0.8 && repeatOneTriggeredRef.current !== tr.id) {
                 if (DEBUG()) console.log(`Repeat One Triggered for ${tr.title}`);
-                repeatOneTriggeredRef.current = tr.id; // Mark as triggered for this track instance
-                // Call skipTo without await to avoid blocking the interval,
-                // skipTo handles commandInProgress flag internally.
+                repeatOneTriggeredRef.current = tr.id;
                 skipTo(currentIndex, 0);
             }
-            // --- END Repeat 'one' logic ---
 
-        }, 500); // UI ticks every 500ms
+        }, 500);
 
         return () => clearInterval(tickInterval);
-    }, [skipTo]); // Added skipTo dependency
+    }, [skipTo]);
 
-
-    // --- Input Handlers ---
-    /* ... Volume, Seek, Search, Login handlers remain the same ... */
-        const handleVolumeChange = useCallback(async (e) => {
+    // Input Handlers
+    const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
 
@@ -765,7 +756,6 @@ useEffect(() => {
         }
     }, []);
 
-    // Seek Logic
     const handleSeekInput = useCallback((e) => {
         setState(prevState => {
             const tr = prevState.playlist[prevState.currentIndex];
@@ -793,7 +783,6 @@ useEffect(() => {
         await skipTo(currentState.currentIndex, pos);
     }, [skipTo]);
 
-    // Search Logic
     useEffect(() => {
         let searchTimer;
         const q = searchQuery.trim();
@@ -832,7 +821,6 @@ useEffect(() => {
         }
     }, [refreshState]);
 
-    // Login Logic
     const handleConfigChange = useCallback((e) => {
         setConfigForm(f => ({ ...f, [e.target.id]: e.target.value }));
     }, []);
@@ -857,9 +845,7 @@ useEffect(() => {
         }
     }, [configForm, refreshState, handleTransport]);
 
-
-    // --- DND-KIT SENSORS ---
-    /* ... Sensors setup remains the same ... */
+    // DND-KIT SENSORS
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -867,28 +853,24 @@ useEffect(() => {
         })
     );
 
-    // --- DND-KIT Drag End Handler ---
-    /* ... handleDragEnd (Attempt 3) remains the same ... */
+    // DND-KIT Drag End Handler
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
 
-            // --- FIX V3: Store state and calculate precise position ---
             const currentState = stateRef.current;
             const wasPlaying = currentState.playing;
             const currentTrack = currentState.playlist[currentState.currentIndex];
             const currentTrackId = currentTrack?.id;
 
-            // Calculate the *precise* position at the moment of the drop
             const dur = Math.max(0, currentTrack?.duration || 0);
-            let precisePosition = currentState.position; // Default
+            let precisePosition = currentState.position;
             if (wasPlaying) {
                  const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
                  precisePosition = Math.min(dur, currentState.localTickStart + dt);
             }
             precisePosition = Math.floor(Math.max(0, precisePosition));
-            // --- END FIX V3 ---
 
             const currentPlaylist = currentState.playlist;
 
@@ -897,76 +879,62 @@ useEffect(() => {
 
             if (oldIndex === -1 || newIndex === -1) return;
 
-            // 1. Get the new playlist order
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
 
-            // 2. Update React state immediately
             setState(prev => ({
               ...prev,
               playlist: newPlaylist,
-              playing: wasPlaying // Optimistically keep playing state
+              playing: wasPlaying
             }));
 
-            // 3. Get the list of IDs in the new order
             const ids = newPlaylist.map(song => song.id);
             const qs = ids.map(id => `&id=${encodeURIComponent(id)}`).join('');
 
-            // 4. Asynchronously send updates to the server
             try {
                 commandInProgress.current = true;
-                if (DEBUG()) console.log(`[DnD V3] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
+                if (DEBUG()) console.log(`[DnD] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
 
-                // Send the disruptive 'set' command
                 await callJukebox('set', qs);
-                if (DEBUG()) console.log(`[DnD V3] 'set' command sent`);
+                if (DEBUG()) console.log(`[DnD] 'set' command sent`);
 
-                // --- FIX V3: Add small delay AFTER 'set' ---
-                await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
-                if (DEBUG()) console.log(`[DnD V3] 50ms delay finished`);
-                // --- END FIX V3 ---
+                await new Promise(resolve => setTimeout(resolve, 50));
+                if (DEBUG()) console.log(`[DnD] 50ms delay finished`);
 
-                // --- Restore playback state ---
                 const newPlayingIndex = currentTrackId
                     ? newPlaylist.findIndex(song => song.id === currentTrackId)
                     : -1;
 
-                if (DEBUG()) console.log(`[DnD V3] Original track new index: ${newPlayingIndex}`);
+                if (DEBUG()) console.log(`[DnD] Original track new index: ${newPlayingIndex}`);
 
                 if (newPlayingIndex !== -1) {
-                    // Send 'skip' to restore position
-                     if (DEBUG()) console.log(`[DnD V3] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
+                     if (DEBUG()) console.log(`[DnD] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
                     await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`);
 
-                    // If it was playing, send 'start'
                     if (wasPlaying) {
-                         if (DEBUG()) console.log(`[DnD V3] Sending 'start'`);
+                         if (DEBUG()) console.log(`[DnD] Sending 'start'`);
                         await callJukebox('start');
                     }
                 } else if (wasPlaying) {
-                    // Fallback if original track not found
-                     if (DEBUG()) console.log(`[DnD V3] Original track not found, starting queue from index 0`);
+                     if (DEBUG()) console.log(`[DnD] Original track not found, starting queue from index 0`);
                      await callJukebox('skip', `&index=0&offset=0`);
                      await callJukebox('start');
                 }
-                // --- END Restore playback state ---
 
-                // 7. Re-sync state AFTER restoring (keep previous delay)
-                if (DEBUG()) console.log(`[DnD V3] Waiting 150ms before final refresh`);
+                if (DEBUG()) console.log(`[DnD] Waiting 150ms before final refresh`);
                 await new Promise(resolve => setTimeout(resolve, 150));
-                if (DEBUG()) console.log(`[DnD V3] Performing final refresh`);
+                if (DEBUG()) console.log(`[DnD] Performing final refresh`);
                 await refreshState(true);
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
-                await refreshState(true); // Revert on error
+                await refreshState(true);
             } finally {
                 commandInProgress.current = false;
-                 if (DEBUG()) console.log(`[DnD V3] Drag end handler finished`);
+                 if (DEBUG()) console.log(`[DnD] Drag end handler finished`);
             }
         }
     }, [refreshState]);
 
-
-    // --- Derived State ---
+    // Derived State
     const currentTrack = state.playlist[state.currentIndex];
 
     const seekValue = useMemo(() => {
@@ -979,7 +947,6 @@ useEffect(() => {
     const seekFillStyle = useMemo(() => ({'--seek-fill': `${(seekValue / 10).toFixed(1)}%`}), [seekValue]);
     const volFillStyle = useMemo(() => ({'--vol-fill': `${Math.round(state.gain * 100)}%`}), [state.gain]);
 
-    // --- ADDED: Repeat button UI state ---
     const repeatButtonText = useMemo(() => {
         if (state.repeatMode === 'one') return '🔂1';
         if (state.repeatMode === 'all') return '🔂';
@@ -991,13 +958,11 @@ useEffect(() => {
         return 'Repeat Off';
     }, [state.repeatMode]);
 
-
-    // --- RENDER ---
+    // RENDER
     return (
         <>
             <div className="player-shell">
                 <aside className="cover-card">
-                    {/* ... Cover card content ... */}
                     <img className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 900)} />
                     <div className="meta">
                         <div className="title">{currentTrack?.title || 'Nothing playing'}</div>
@@ -1020,14 +985,12 @@ useEffect(() => {
                         <div id="statusText">{statusText}</div>
                         <div className="small">Queue: <span id="queueCount">{state.playlist.length}</span> tracks</div>
                     </div>
-                    {/* --- MODIFIED: Added Repeat button to controls --- */}
                     <div className="controls">
                       <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
                       <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
                         {state.playing ? '⏸' : '▶'}
                       </button>
                       <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
-                      {/* Repeat Button */}
                       <button
                         className={`btn repeat ${state.repeatMode !== 'off' ? 'active' : ''}`}
                         title={repeatButtonTitle}
@@ -1040,7 +1003,6 @@ useEffect(() => {
                     </div>
 
                     <div className="progress">
-                        {/* ... Progress bar content ... */}
                          <div className="time">{fmtTime(state.position)}</div>
                         <input
                             className="seek" type="range" min="0" max="1000"
@@ -1052,7 +1014,6 @@ useEffect(() => {
                     </div>
 
                     <div className="vol">
-                         {/* ... Volume control content ... */}
                          <div className="vol-row">
                             <div title="Volume">🔊</div>
                             <input
@@ -1071,7 +1032,6 @@ useEffect(() => {
                 <aside className="side-card">
                     <h3>Queue</h3>
                     
-                    {/* --- DND Queue List --- */}
                     <DndContext 
                         sensors={sensors}
                         collisionDetection={closestCenter}
@@ -1096,7 +1056,6 @@ useEffect(() => {
                         </SortableContext>
                     </DndContext>
                     
-                     {/* ... Search and Config sections ... */}
                      <div className="search-box">
                         <input
                             placeholder="Search songs to add…"
