@@ -193,6 +193,32 @@ function fmtTime(sec) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function formatDuration(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    
+    const days = Math.floor(sec / 86400); // 86400 seconds in a day
+    sec %= 86400;
+    
+    const hours = Math.floor(sec / 3600);
+    sec %= 3600;
+    
+    const minutes = Math.floor(sec / 60);
+    
+    const parts = [];
+    
+    if (days > 0) {
+        parts.push(`${days}d`);
+    }
+    if (hours > 0) {
+        parts.push(`${hours}h`);
+    }
+    if (minutes > 0 || parts.length === 0) {
+        parts.push(`${minutes}m`);
+    }
+    
+    return parts.join(' ');
+}
+
 // ============ ENHANCED PLAYBACK STATE MANAGEMENT ============
 class PlaybackStateManager {
     constructor() {
@@ -741,8 +767,8 @@ export default function App() {
         }, 0);
     }, [state.playlist]);
 
-    const totalQueueTimeStr = useMemo(() => fmtTime(totalQueueSeconds), [totalQueueSeconds]);
-
+    const totalQueueTimeStr = useMemo(() => formatDuration(totalQueueSeconds), [totalQueueSeconds]);
+    
     // ============ ENHANCED VISIBILITY CHANGE HANDLER ============
     useEffect(() => {
         const handleVisibilityChange = async () => {
