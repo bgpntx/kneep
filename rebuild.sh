@@ -14,7 +14,7 @@ echo ">>> Installing dependencies..."
 npm install
 
 echo ">>> Auditing and fixing packages..."
-npm audit fix --force || true   # allow audit to fail without aborting
+npm audit fix || true   # allow audit to fail without aborting
 
 echo ">>> Building frontend..."
 npm run build
