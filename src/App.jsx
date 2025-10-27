@@ -1,4 +1,4 @@
-// src/App.jsx - FIXED: Playback history tracking for missed scrobbles
+// src/App.jsx - FIXED: Enhanced scrobbling with localStorage persistence and comprehensive visibility handling
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
@@ -193,6 +193,143 @@ function fmtTime(sec) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// ============ ENHANCED PLAYBACK STATE MANAGEMENT ============
+class PlaybackStateManager {
+    constructor() {
+        this.storageKey = 'jukeboxPlaybackState';
+        this.scrobbledKey = 'jukeboxScrobbled';
+    }
+
+    // Save current playback state to localStorage
+    saveState(state) {
+        try {
+            const saveData = {
+                currentTrackId: state.currentTrack?.id,
+                currentTrackTitle: state.currentTrack?.title,
+                currentTrackDuration: state.currentTrack?.duration,
+                currentIndex: state.currentIndex,
+                position: state.position,
+                playing: state.playing,
+                timestamp: Date.now(),
+                queueSnapshot: state.playlist.map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    duration: t.duration
+                }))
+            };
+            localStorage.setItem(this.storageKey, JSON.stringify(saveData));
+            if (DEBUG()) console.log('State saved to localStorage:', saveData);
+        } catch (e) {
+            console.error('Failed to save state:', e);
+        }
+    }
+
+    // Load previously saved state
+    loadState() {
+        try {
+            const stored = localStorage.getItem(this.storageKey);
+            if (!stored) return null;
+            const data = JSON.parse(stored);
+            if (DEBUG()) console.log('State loaded from localStorage:', data);
+            return data;
+        } catch (e) {
+            console.error('Failed to load state:', e);
+            return null;
+        }
+    }
+
+    // Calculate what should have played based on elapsed time
+    calculateMissedTracks(savedState, currentState) {
+        if (!savedState || !savedState.playing) return [];
+        
+        const elapsed = (Date.now() - savedState.timestamp) / 1000; // seconds
+        if (elapsed < 30) return []; // Too short to matter
+        
+        if (DEBUG()) console.log(`Time elapsed since last save: ${elapsed.toFixed(0)}s`);
+        
+        const missedTracks = [];
+        let remainingTime = elapsed;
+        let checkIndex = savedState.currentIndex;
+        let startPosition = savedState.position || 0;
+        
+        // Calculate what should have finished playing
+        while (remainingTime > 0 && checkIndex < savedState.queueSnapshot.length) {
+            const track = savedState.queueSnapshot[checkIndex];
+            if (!track) break;
+            
+            const trackDuration = track.duration || 0;
+            const timeLeftInTrack = trackDuration - startPosition;
+            
+            if (remainingTime >= timeLeftInTrack) {
+                // This track should have finished
+                missedTracks.push({
+                    id: track.id,
+                    title: track.title,
+                    duration: trackDuration,
+                    playedTo: trackDuration
+                });
+                remainingTime -= timeLeftInTrack;
+                checkIndex++;
+                startPosition = 0;
+            } else {
+                // We're still in this track
+                missedTracks.push({
+                    id: track.id,
+                    title: track.title,
+                    duration: trackDuration,
+                    playedTo: startPosition + remainingTime
+                });
+                break;
+            }
+        }
+        
+        if (DEBUG() && missedTracks.length > 0) {
+            console.log('Calculated missed tracks:', missedTracks);
+        }
+        
+        return missedTracks;
+    }
+
+    // Get scrobbled IDs from localStorage
+    getScrobbled() {
+        try {
+            const stored = localStorage.getItem(this.scrobbledKey);
+            return stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch (e) {
+            return new Set();
+        }
+    }
+
+    // Save scrobbled IDs
+    saveScrobbled(scrobbledIds) {
+        try {
+            localStorage.setItem(this.scrobbledKey, JSON.stringify([...scrobbledIds]));
+        } catch (e) {
+            console.error('Failed to save scrobbled IDs:', e);
+        }
+    }
+
+    // Add a scrobbled ID
+    addScrobbled(id) {
+        const scrobbled = this.getScrobbled();
+        scrobbled.add(id);
+        this.saveScrobbled(scrobbled);
+        return scrobbled;
+    }
+
+    // Clear old scrobbled IDs (keep last 100)
+    pruneScrobbled() {
+        const scrobbled = this.getScrobbled();
+        if (scrobbled.size > 100) {
+            const arr = [...scrobbled];
+            const keep = new Set(arr.slice(-100));
+            this.saveScrobbled(keep);
+            return keep;
+        }
+        return scrobbled;
+    }
+}
+
 const initialState = {
     playlist: [],
     currentIndex: 0,
@@ -272,94 +409,24 @@ export default function App() {
     const prevIndexRef = useRef(state.currentIndex);
     const nowPlayingIdRef = useRef(null);
     const repeatOneTriggeredRef = useRef(null);
-    const scrobbledIdsRef = useRef(new Set());
-    const playbackHistoryRef = useRef([]);
-    const lastVisibilityCheckRef = useRef(Date.now());
+    const playbackManager = useRef(new PlaybackStateManager());
+    const lastVisibilityStateRef = useRef(!document.hidden);
 
     useEffect(() => { stateRef.current = state; }, [state]);
     
     useEffect(() => {
-        scrobbledIdsRef.current = scrobbledIds;
-    }, [scrobbledIds]);
+        // Load scrobbled IDs from localStorage on mount
+        const stored = playbackManager.current.getScrobbled();
+        setScrobbledIds(stored);
+        if (DEBUG()) console.log('Loaded scrobbled IDs:', stored.size);
+    }, []);
 
     useEffect(() => {
         const fontLink = document.createElement('link');
-        fontLink.href = 'https://googleapis.com/css2?family=Spinnaker&display=swap';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=Spinnaker&display=swap';
         fontLink.rel = 'stylesheet';
         document.head.appendChild(fontLink);
         return () => { document.head.removeChild(fontLink); };
-    }, []);
-
-    const recordPlayback = useCallback((trackId, title, duration, position, timestamp) => {
-        if (!trackId || duration <= 30) return;
-        
-        const existingIndex = playbackHistoryRef.current.findIndex(h => h.trackId === trackId);
-        const entry = {
-            trackId,
-            title,
-            duration,
-            maxPosition: position,
-            lastSeen: timestamp,
-            scrobbled: scrobbledIdsRef.current.has(trackId)
-        };
-        
-        if (existingIndex >= 0) {
-            const existing = playbackHistoryRef.current[existingIndex];
-            entry.maxPosition = Math.max(existing.maxPosition, position);
-            entry.scrobbled = existing.scrobbled || entry.scrobbled;
-            playbackHistoryRef.current[existingIndex] = entry;
-        } else {
-            playbackHistoryRef.current.push(entry);
-        }
-        
-        if (playbackHistoryRef.current.length > 20) {
-            playbackHistoryRef.current = playbackHistoryRef.current.slice(-20);
-        }
-        
-        if (DEBUG()) console.log(`Recorded: ${title} at ${position.toFixed(1)}s/${duration}s`);
-    }, []);
-
-    const processMissedScrobbles = useCallback(async () => {
-        const now = Date.now();
-        const timeSinceLastCheck = (now - lastVisibilityCheckRef.current) / 1000;
-        
-        if (DEBUG()) console.log(`Checking for missed scrobbles (inactive for ${timeSinceLastCheck.toFixed(0)}s)`);
-        
-        let scrobbleCount = 0;
-        
-        for (const entry of playbackHistoryRef.current) {
-            if (entry.scrobbled || scrobbledIdsRef.current.has(entry.trackId)) {
-                continue;
-            }
-            
-            const isHalfway = entry.maxPosition >= entry.duration / 2;
-            const isFourMinutes = entry.maxPosition >= 240;
-            
-            if (isHalfway || isFourMinutes) {
-                if (DEBUG()) {
-                    console.log(`MISSED SCROBBLE: ${entry.title} (played to ${entry.maxPosition.toFixed(1)}s/${entry.duration}s)`);
-                }
-                
-                await scrobble(entry.trackId, true);
-                entry.scrobbled = true;
-                setScrobbledIds(prev => new Set(prev).add(entry.trackId));
-                scrobbleCount++;
-                
-                if (scrobbleCount > 1) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-            }
-        }
-        
-        if (scrobbleCount > 0) {
-            const msg = `Caught up: Scrobbled ${scrobbleCount} track(s)`;
-            setStatusText(msg);
-            setTimeout(() => {
-                setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
-            }, 3000);
-        }
-        
-        lastVisibilityCheckRef.current = now;
     }, []);
 
     const updateMediaSession = useCallback((track, position, playing) => {
@@ -484,14 +551,15 @@ export default function App() {
 
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
 
+            // Save state to localStorage
             if (currentTrack && status.playing) {
-                recordPlayback(
-                    currentTrack.id,
-                    currentTrack.title,
-                    currentTrack.duration,
-                    status.position,
-                    Date.now()
-                );
+                playbackManager.current.saveState({
+                    currentTrack,
+                    currentIndex: status.currentIndex,
+                    position: status.position,
+                    playing: status.playing,
+                    playlist: newPlaylist
+                });
             }
 
             return {
@@ -512,39 +580,70 @@ export default function App() {
             console.error('Refresh failed:', e);
             return null;
         }
-    }, [recordPlayback]);
+    }, []);
 
-    const checkAndScrobble = useCallback(async (freshData) => {
-        if (!freshData || !freshData.trackId) return;
+    const scrobbleTrack = useCallback(async (trackId, title, duration, playedTo) => {
+        if (!trackId || duration <= 30) return false;
+        
+        // Check if already scrobbled
+        if (scrobbledIds.has(trackId)) {
+            if (DEBUG()) console.log(`Already scrobbled: ${title}`);
+            return false;
+        }
 
-        const { trackId, title, duration, position, playing } = freshData;
-        const dur = Math.max(0, duration || 0);
-        const pos = Math.max(0, position || 0);
+        const isHalfway = playedTo >= duration / 2;
+        const isFourMinutes = playedTo >= 240;
 
-        if (dur > 30 && !scrobbledIdsRef.current.has(trackId)) {
-            const isHalfway = pos >= dur / 2;
-            const isFourMinutes = pos >= 240;
+        if (isHalfway || isFourMinutes) {
+            if (DEBUG()) console.log(`✓ Scrobbling: ${title} (${playedTo.toFixed(1)}s/${duration}s)`);
+            await scrobble(trackId, true);
+            
+            // Update scrobbled IDs
+            const newScrobbled = playbackManager.current.addScrobbled(trackId);
+            setScrobbledIds(newScrobbled);
+            
+            return true;
+        }
+        
+        return false;
+    }, [scrobbledIds]);
 
-            if (isHalfway || isFourMinutes) {
-                if (DEBUG()) console.log(`Scrobbling current track: ${title} (pos=${pos.toFixed(1)}s, dur=${dur}s)`);
-                await scrobble(trackId, true);
-                
-                setScrobbledIds(prev => new Set(prev).add(trackId));
+    const processMissedScrobbles = useCallback(async (savedState, currentState) => {
+        if (!savedState) return 0;
+        
+        const missedTracks = playbackManager.current.calculateMissedTracks(savedState, currentState);
+        
+        if (missedTracks.length === 0) {
+            if (DEBUG()) console.log('No missed tracks to scrobble');
+            return 0;
+        }
 
-                const scrobbleMsg = `Scrobbled: ${title}`;
-                setStatusText(scrobbleMsg);
-                
-                setTimeout(() => {
-                    setStatusText((currentStatusText) => {
-                        if (currentStatusText === scrobbleMsg) {
-                            return playing ? '▶️ Playing' : '⏸️ Paused';
-                        }
-                        return currentStatusText;
-                    });
-                }, 3000);
+        let scrobbleCount = 0;
+        
+        for (const track of missedTracks) {
+            const scrobbled = await scrobbleTrack(track.id, track.title, track.duration, track.playedTo);
+            if (scrobbled) {
+                scrobbleCount++;
+                // Rate limit between scrobbles
+                if (scrobbleCount < missedTracks.length) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
             }
         }
-    }, []);
+        
+        if (scrobbleCount > 0) {
+            console.log(`✓ Caught up: Scrobbled ${scrobbleCount} missed track(s)`);
+        }
+        
+        return scrobbleCount;
+    }, [scrobbleTrack]);
+
+    const checkAndScrobble = useCallback(async (freshData) => {
+        if (!freshData || !freshData.trackId || !freshData.playing) return;
+
+        const { trackId, title, duration, position } = freshData;
+        await scrobbleTrack(trackId, title, duration, position);
+    }, [scrobbleTrack]);
 
     const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
@@ -635,15 +734,58 @@ export default function App() {
         });
     }, []);
 
+    // ============ ENHANCED VISIBILITY CHANGE HANDLER ============
     useEffect(() => {
         const handleVisibilityChange = async () => {
-            if (document.hidden === false && isAuthenticated) {
-                if (DEBUG()) console.log('Page became visible, checking for missed scrobbles...');
+            const nowHidden = document.hidden;
+            const wasHidden = !lastVisibilityStateRef.current;
+            
+            if (!nowHidden && wasHidden && isAuthenticated) {
+                // Tab became visible after being hidden
+                if (DEBUG()) console.log('🔄 Tab became visible - checking for missed scrobbles...');
                 
+                // Load saved state
+                const savedState = playbackManager.current.loadState();
+                
+                // Get fresh state from server
                 const freshData = await refreshState(true);
+                
+                // Process missed scrobbles based on time elapsed
+                if (savedState && freshData) {
+                    const scrobbleCount = await processMissedScrobbles(savedState, stateRef.current);
+                    
+                    if (scrobbleCount > 0) {
+                        setStatusText(`✓ Caught up: ${scrobbleCount} track(s) scrobbled`);
+                        setTimeout(() => {
+                            setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+                        }, 3000);
+                    }
+                }
+                
+                // Also check current track
                 await checkAndScrobble(freshData);
-                await processMissedScrobbles();
+                
+                // Prune old scrobbled IDs
+                const pruned = playbackManager.current.pruneScrobbled();
+                setScrobbledIds(pruned);
+            } else if (nowHidden && !wasHidden) {
+                // Tab became hidden - save current state
+                const currentState = stateRef.current;
+                const currentTrack = currentState.playlist[currentState.currentIndex];
+                
+                if (currentTrack && currentState.playing) {
+                    playbackManager.current.saveState({
+                        currentTrack,
+                        currentIndex: currentState.currentIndex,
+                        position: currentState.position,
+                        playing: currentState.playing,
+                        playlist: currentState.playlist
+                    });
+                    if (DEBUG()) console.log('💾 Tab hidden - state saved');
+                }
             }
+            
+            lastVisibilityStateRef.current = !nowHidden;
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -749,6 +891,7 @@ export default function App() {
 
     }, [state.currentIndex, state.playlist.length, refreshState]);
 
+    // ============ POLLING WITH STATE PERSISTENCE ============
     useEffect(() => {
         if (!isAuthenticated) return;
 
@@ -759,6 +902,21 @@ export default function App() {
             } catch (e) {
                 console.error("Background poll refresh failed:", e);
                 return;
+            }
+
+            // Save state after each successful poll
+            if (freshData && freshData.playing) {
+                const currentState = stateRef.current;
+                const currentTrack = currentState.playlist[currentState.currentIndex];
+                if (currentTrack) {
+                    playbackManager.current.saveState({
+                        currentTrack,
+                        currentIndex: currentState.currentIndex,
+                        position: currentState.position,
+                        playing: currentState.playing,
+                        playlist: currentState.playlist
+                    });
+                }
             }
 
             await checkAndScrobble(freshData);
@@ -795,10 +953,6 @@ export default function App() {
             const pos = Math.min(dur, localTickStart + dt);
 
             setState(prev => ({ ...prev, position: pos }));
-            
-            if (tr.id && dur > 30) {
-                recordPlayback(tr.id, tr.title, dur, pos, Date.now());
-            }
 
             if (repeatMode === 'one' && dur > 1 && pos >= dur - 0.8 && repeatOneTriggeredRef.current !== tr.id) {
                 if (DEBUG()) console.log(`Repeat One Triggered for ${tr.title}`);
@@ -809,7 +963,7 @@ export default function App() {
         }, 500);
 
         return () => clearInterval(tickInterval);
-    }, [skipTo, recordPlayback]);
+    }, [skipTo]);
 
     const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
@@ -1140,7 +1294,7 @@ export default function App() {
                         </div>
                         <div className="small">
                             {isAuthenticated
-                                ? '✓ Connected. Your password is never stored.'
+                                ? '✓ Connected. Scrobbles are saved persistently.'
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
                         </div>
                     </div>

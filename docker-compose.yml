@@ -14,8 +14,11 @@ services:
       ND_JUKEBOX_ENABLED: "true"
       ND_JUKEBOX_ADMINONLY: "false"
       ND_MPV_CMD_TEMPLATE: "mpv --no-video --af=loudnorm --audio-device='alsa/sysdefault:CARD=U24XL' --input-ipc-server=%s %f"
+      # Last.fm integration - reads from .env file
       ND_LASTFM_APIKEY: ${LASTFM_API_KEY}
       ND_LASTFM_SECRET: ${LASTFM_SECRET}
+      ND_LASTFM_ENABLED: "true"
+      ND_LASTFM_LANGUAGE: "en"
     # Only expose internally to docker network, not to host
     expose:
       - "4533"
