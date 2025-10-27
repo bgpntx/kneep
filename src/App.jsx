@@ -1,6 +1,5 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat - FIXED SCROBBLING
+// src/App.jsx - FIXED: Playback history tracking for missed scrobbles
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-// --- DND-KIT IMPORTS ---
 import {
   DndContext,
   closestCenter,
@@ -19,7 +18,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
-// --- Jukebox API Logic ---
 const API_VERSION = '1.16.1';
 const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
 
@@ -188,7 +186,6 @@ async function reconnect() {
     try { await callJukebox('get'); return true; } catch (error) { clearSession(); return false; }
 }
 
-// --- UTILITY FUNCTIONS ---
 function fmtTime(sec) {
     sec = Math.max(0, Math.floor(sec));
     const m = Math.floor(sec / 60);
@@ -196,7 +193,6 @@ function fmtTime(sec) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// --- INITIAL STATE ---
 const initialState = {
     playlist: [],
     currentIndex: 0,
@@ -210,7 +206,6 @@ const initialState = {
     endHandledForId: null,
 };
 
-// --- Component for a single sortable queue item ---
 function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const isCurrent = index === currentIndex;
 
@@ -264,7 +259,6 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
 }
 
 export default function App() {
-    // --- State variables ---
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
@@ -273,23 +267,21 @@ export default function App() {
     const [searchResults, setSearchResults] = useState([]);
     const [scrobbledIds, setScrobbledIds] = useState(new Set());
 
-    // --- Refs ---
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
     const prevIndexRef = useRef(state.currentIndex);
     const nowPlayingIdRef = useRef(null);
     const repeatOneTriggeredRef = useRef(null);
-    // --- FIX: Ref for scrobbled IDs to avoid effect dependency issues ---
     const scrobbledIdsRef = useRef(new Set());
+    const playbackHistoryRef = useRef([]);
+    const lastVisibilityCheckRef = useRef(Date.now());
 
     useEffect(() => { stateRef.current = state; }, [state]);
     
-    // Sync scrobbledIds ref with state
     useEffect(() => {
         scrobbledIdsRef.current = scrobbledIds;
     }, [scrobbledIds]);
 
-    // --- Font Loading ---
     useEffect(() => {
         const fontLink = document.createElement('link');
         fontLink.href = 'https://googleapis.com/css2?family=Spinnaker&display=swap';
@@ -298,7 +290,78 @@ export default function App() {
         return () => { document.head.removeChild(fontLink); };
     }, []);
 
-    // --- Media Session API ---
+    const recordPlayback = useCallback((trackId, title, duration, position, timestamp) => {
+        if (!trackId || duration <= 30) return;
+        
+        const existingIndex = playbackHistoryRef.current.findIndex(h => h.trackId === trackId);
+        const entry = {
+            trackId,
+            title,
+            duration,
+            maxPosition: position,
+            lastSeen: timestamp,
+            scrobbled: scrobbledIdsRef.current.has(trackId)
+        };
+        
+        if (existingIndex >= 0) {
+            const existing = playbackHistoryRef.current[existingIndex];
+            entry.maxPosition = Math.max(existing.maxPosition, position);
+            entry.scrobbled = existing.scrobbled || entry.scrobbled;
+            playbackHistoryRef.current[existingIndex] = entry;
+        } else {
+            playbackHistoryRef.current.push(entry);
+        }
+        
+        if (playbackHistoryRef.current.length > 20) {
+            playbackHistoryRef.current = playbackHistoryRef.current.slice(-20);
+        }
+        
+        if (DEBUG()) console.log(`Recorded: ${title} at ${position.toFixed(1)}s/${duration}s`);
+    }, []);
+
+    const processMissedScrobbles = useCallback(async () => {
+        const now = Date.now();
+        const timeSinceLastCheck = (now - lastVisibilityCheckRef.current) / 1000;
+        
+        if (DEBUG()) console.log(`Checking for missed scrobbles (inactive for ${timeSinceLastCheck.toFixed(0)}s)`);
+        
+        let scrobbleCount = 0;
+        
+        for (const entry of playbackHistoryRef.current) {
+            if (entry.scrobbled || scrobbledIdsRef.current.has(entry.trackId)) {
+                continue;
+            }
+            
+            const isHalfway = entry.maxPosition >= entry.duration / 2;
+            const isFourMinutes = entry.maxPosition >= 240;
+            
+            if (isHalfway || isFourMinutes) {
+                if (DEBUG()) {
+                    console.log(`MISSED SCROBBLE: ${entry.title} (played to ${entry.maxPosition.toFixed(1)}s/${entry.duration}s)`);
+                }
+                
+                await scrobble(entry.trackId, true);
+                entry.scrobbled = true;
+                setScrobbledIds(prev => new Set(prev).add(entry.trackId));
+                scrobbleCount++;
+                
+                if (scrobbleCount > 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+        }
+        
+        if (scrobbleCount > 0) {
+            const msg = `Caught up: Scrobbled ${scrobbleCount} track(s)`;
+            setStatusText(msg);
+            setTimeout(() => {
+                setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+            }, 3000);
+        }
+        
+        lastVisibilityCheckRef.current = now;
+    }, []);
+
     const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
@@ -383,7 +446,6 @@ export default function App() {
         }
     }, []);
 
-    // --- Core State Refresh Logic ---
     const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
             return null;
@@ -422,6 +484,16 @@ export default function App() {
 
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
 
+            if (currentTrack && status.playing) {
+                recordPlayback(
+                    currentTrack.id,
+                    currentTrack.title,
+                    currentTrack.duration,
+                    status.position,
+                    Date.now()
+                );
+            }
+
             return {
                 trackId: currentTrack?.id,
                 title: currentTrack?.title,
@@ -440,9 +512,8 @@ export default function App() {
             console.error('Refresh failed:', e);
             return null;
         }
-    }, []);
+    }, [recordPlayback]);
 
-    // --- FIX: Reusable scrobble checking function ---
     const checkAndScrobble = useCallback(async (freshData) => {
         if (!freshData || !freshData.trackId) return;
 
@@ -455,7 +526,7 @@ export default function App() {
             const isFourMinutes = pos >= 240;
 
             if (isHalfway || isFourMinutes) {
-                if (DEBUG()) console.log(`Scrobbling: ${title} (pos=${pos.toFixed(1)}s, dur=${dur}s, halfway=${isHalfway}, 4min=${isFourMinutes})`);
+                if (DEBUG()) console.log(`Scrobbling current track: ${title} (pos=${pos.toFixed(1)}s, dur=${dur}s)`);
                 await scrobble(trackId, true);
                 
                 setScrobbledIds(prev => new Set(prev).add(trackId));
@@ -475,7 +546,6 @@ export default function App() {
         }
     }, []);
 
-    // --- Transport & Queue Actions ---
     const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
@@ -565,14 +635,14 @@ export default function App() {
         });
     }, []);
 
-    // --- FIX: Visibility change handler with scrobble check ---
     useEffect(() => {
         const handleVisibilityChange = async () => {
             if (document.hidden === false && isAuthenticated) {
-                if (DEBUG()) console.log('Page became visible, forcing state refresh and checking scrobbles.');
+                if (DEBUG()) console.log('Page became visible, checking for missed scrobbles...');
                 
                 const freshData = await refreshState(true);
                 await checkAndScrobble(freshData);
+                await processMissedScrobbles();
             }
         };
 
@@ -581,7 +651,7 @@ export default function App() {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [refreshState, isAuthenticated, checkAndScrobble]);
+    }, [refreshState, isAuthenticated, checkAndScrobble, processMissedScrobbles]);
 
     useEffect(() => {
         setupMediaSessionHandlers(handleTransport);
@@ -594,7 +664,6 @@ export default function App() {
         }
     }, [state.currentIndex, state.playlist, state.position, state.playing, updateMediaSession]);
 
-    // Initialization
     useEffect(() => {
         let mounted = true;
 
@@ -648,7 +717,6 @@ export default function App() {
         return () => { mounted = false; };
     }, [refreshState]);
 
-    // Auto-remove finished songs
     useEffect(() => {
         const prevIndex = prevIndexRef.current;
         const currentIndex = state.currentIndex;
@@ -663,7 +731,7 @@ export default function App() {
                     }
 
                     if (indexesToRemove.length > 0) {
-                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
+                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s)`);
 
                         for (const index of indexesToRemove.reverse()) {
                             await callJukebox('remove', `&index=${index}`);
@@ -681,7 +749,6 @@ export default function App() {
 
     }, [state.currentIndex, state.playlist.length, refreshState]);
 
-    // --- FIX: Polling loop with scrobble checking ---
     useEffect(() => {
         if (!isAuthenticated) return;
 
@@ -700,7 +767,6 @@ export default function App() {
         return () => clearInterval(pollInterval);
     }, [refreshState, isAuthenticated, checkAndScrobble]);
 
-    // "Now Playing" update effect
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
         if (state.playing && currentTrack && nowPlayingIdRef.current !== currentTrack.id) {
@@ -712,7 +778,6 @@ export default function App() {
         }
     }, [state.playing, state.currentIndex, state.playlist]);
 
-    // Position Ticker & Repeat Logic
     useEffect(() => {
         const tickInterval = setInterval(() => {
             const currentState = stateRef.current;
@@ -730,6 +795,10 @@ export default function App() {
             const pos = Math.min(dur, localTickStart + dt);
 
             setState(prev => ({ ...prev, position: pos }));
+            
+            if (tr.id && dur > 30) {
+                recordPlayback(tr.id, tr.title, dur, pos, Date.now());
+            }
 
             if (repeatMode === 'one' && dur > 1 && pos >= dur - 0.8 && repeatOneTriggeredRef.current !== tr.id) {
                 if (DEBUG()) console.log(`Repeat One Triggered for ${tr.title}`);
@@ -740,9 +809,8 @@ export default function App() {
         }, 500);
 
         return () => clearInterval(tickInterval);
-    }, [skipTo]);
+    }, [skipTo, recordPlayback]);
 
-    // Input Handlers
     const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
@@ -845,7 +913,6 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
-    // DND-KIT SENSORS
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -853,7 +920,6 @@ export default function App() {
         })
     );
 
-    // DND-KIT Drag End Handler
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
@@ -892,49 +958,36 @@ export default function App() {
 
             try {
                 commandInProgress.current = true;
-                if (DEBUG()) console.log(`[DnD] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
 
                 await callJukebox('set', qs);
-                if (DEBUG()) console.log(`[DnD] 'set' command sent`);
-
                 await new Promise(resolve => setTimeout(resolve, 50));
-                if (DEBUG()) console.log(`[DnD] 50ms delay finished`);
 
                 const newPlayingIndex = currentTrackId
                     ? newPlaylist.findIndex(song => song.id === currentTrackId)
                     : -1;
 
-                if (DEBUG()) console.log(`[DnD] Original track new index: ${newPlayingIndex}`);
-
                 if (newPlayingIndex !== -1) {
-                     if (DEBUG()) console.log(`[DnD] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
                     await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`);
 
                     if (wasPlaying) {
-                         if (DEBUG()) console.log(`[DnD] Sending 'start'`);
                         await callJukebox('start');
                     }
                 } else if (wasPlaying) {
-                     if (DEBUG()) console.log(`[DnD] Original track not found, starting queue from index 0`);
                      await callJukebox('skip', `&index=0&offset=0`);
                      await callJukebox('start');
                 }
 
-                if (DEBUG()) console.log(`[DnD] Waiting 150ms before final refresh`);
                 await new Promise(resolve => setTimeout(resolve, 150));
-                if (DEBUG()) console.log(`[DnD] Performing final refresh`);
                 await refreshState(true);
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
                 await refreshState(true);
             } finally {
                 commandInProgress.current = false;
-                 if (DEBUG()) console.log(`[DnD] Drag end handler finished`);
             }
         }
     }, [refreshState]);
 
-    // Derived State
     const currentTrack = state.playlist[state.currentIndex];
 
     const seekValue = useMemo(() => {
@@ -958,7 +1011,6 @@ export default function App() {
         return 'Repeat Off';
     }, [state.repeatMode]);
 
-    // RENDER
     return (
         <>
             <div className="player-shell">
