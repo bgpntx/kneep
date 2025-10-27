@@ -1,5 +1,6 @@
-// src/App.jsx - FIXED: Enhanced scrobbling with localStorage persistence and comprehensive visibility handling
+// src/App.jsx - Jukebox Player (Server-Side Scrobbling)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+// --- DND-KIT IMPORTS ---
 import {
   DndContext,
   closestCenter,
@@ -18,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
+// --- Jukebox API Logic ---
 const API_VERSION = '1.16.1';
 const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
 
@@ -28,6 +30,7 @@ let config = JSON.parse(localStorage.getItem('jukeboxConfig')) || {
     salt: ''
 };
 
+// --- MD5 HASH FUNCTION (unchanged) ---
 function md5(string) {
     function rotateLeft(lValue, iShiftBits) {
         return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits));
@@ -85,6 +88,7 @@ function md5(string) {
     return temp.toLowerCase();
 }
 
+// --- API HELPER FUNCTIONS (unchanged) ---
 function generateSalt() { return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15); }
 function generateToken(password, salt) { return md5(password + salt); }
 function isSessionValid() { return !!(config.token && config.salt && config.username); }
@@ -148,22 +152,9 @@ async function searchSongs(query) {
     const data = await res.json();
     return data?.['subsonic-response']?.searchResult3?.song || [];
 }
-async function scrobble(id, submission = false) {
-    if (!isSessionValid() || !id) {
-        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.');
-        return;
-    }
-    const extra = `&id=${encodeURIComponent(id)}&submission=${submission}`;
-    const url = `${config.serverUrl}/rest/scrobble?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json${extra}`;
-    try {
-        const res = await fetch(url);
-        if (!res.ok) { if (DEBUG()) console.warn(`Scrobble API returned HTTP ${res.status}`); return; }
-        const data = await res.json();
-        const resp = data?.['subsonic-response'];
-        if (DEBUG()) { const type = submission ? 'Scrobble' : 'Now Playing'; console.log(`${type} response for ID ${id}:`, data); }
-        if (resp?.status !== 'ok') { if (DEBUG()) console.warn(`Scrobble API error: ${resp?.error?.message}`); }
-    } catch (error) { if (DEBUG()) console.error('Scrobble call failed:', error.message); }
-}
+
+// --- REMOVED scrobble function ---
+
 function getConfig() { return { serverUrl: config.serverUrl, username: config.username }; }
 async function authenticate(serverUrl, username, password) {
     if (!username || !password) throw new Error('Username and password are required');
@@ -178,7 +169,7 @@ async function authenticate(serverUrl, username, password) {
     if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Authentication failed'; throw new Error(errorMsg); }
     config = { serverUrl, username, token, salt };
     localStorage.setItem('jukeboxConfig', JSON.stringify(config));
-    if (DEBUG()) { console.log('Authentication successful'); console.log('Token:', token); console.log('Salt:', salt); }
+    if (DEBUG()) { console.log('Authentication successful'); }
     return config;
 }
 async function reconnect() {
@@ -186,6 +177,7 @@ async function reconnect() {
     try { await callJukebox('get'); return true; } catch (error) { clearSession(); return false; }
 }
 
+// --- UTILITY FUNCTIONS ---
 function fmtTime(sec) {
     sec = Math.max(0, Math.floor(sec));
     const m = Math.floor(sec / 60);
@@ -193,143 +185,7 @@ function fmtTime(sec) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// ============ ENHANCED PLAYBACK STATE MANAGEMENT ============
-class PlaybackStateManager {
-    constructor() {
-        this.storageKey = 'jukeboxPlaybackState';
-        this.scrobbledKey = 'jukeboxScrobbled';
-    }
-
-    // Save current playback state to localStorage
-    saveState(state) {
-        try {
-            const saveData = {
-                currentTrackId: state.currentTrack?.id,
-                currentTrackTitle: state.currentTrack?.title,
-                currentTrackDuration: state.currentTrack?.duration,
-                currentIndex: state.currentIndex,
-                position: state.position,
-                playing: state.playing,
-                timestamp: Date.now(),
-                queueSnapshot: state.playlist.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    duration: t.duration
-                }))
-            };
-            localStorage.setItem(this.storageKey, JSON.stringify(saveData));
-            if (DEBUG()) console.log('State saved to localStorage:', saveData);
-        } catch (e) {
-            console.error('Failed to save state:', e);
-        }
-    }
-
-    // Load previously saved state
-    loadState() {
-        try {
-            const stored = localStorage.getItem(this.storageKey);
-            if (!stored) return null;
-            const data = JSON.parse(stored);
-            if (DEBUG()) console.log('State loaded from localStorage:', data);
-            return data;
-        } catch (e) {
-            console.error('Failed to load state:', e);
-            return null;
-        }
-    }
-
-    // Calculate what should have played based on elapsed time
-    calculateMissedTracks(savedState, currentState) {
-        if (!savedState || !savedState.playing) return [];
-        
-        const elapsed = (Date.now() - savedState.timestamp) / 1000; // seconds
-        if (elapsed < 30) return []; // Too short to matter
-        
-        if (DEBUG()) console.log(`Time elapsed since last save: ${elapsed.toFixed(0)}s`);
-        
-        const missedTracks = [];
-        let remainingTime = elapsed;
-        let checkIndex = savedState.currentIndex;
-        let startPosition = savedState.position || 0;
-        
-        // Calculate what should have finished playing
-        while (remainingTime > 0 && checkIndex < savedState.queueSnapshot.length) {
-            const track = savedState.queueSnapshot[checkIndex];
-            if (!track) break;
-            
-            const trackDuration = track.duration || 0;
-            const timeLeftInTrack = trackDuration - startPosition;
-            
-            if (remainingTime >= timeLeftInTrack) {
-                // This track should have finished
-                missedTracks.push({
-                    id: track.id,
-                    title: track.title,
-                    duration: trackDuration,
-                    playedTo: trackDuration
-                });
-                remainingTime -= timeLeftInTrack;
-                checkIndex++;
-                startPosition = 0;
-            } else {
-                // We're still in this track
-                missedTracks.push({
-                    id: track.id,
-                    title: track.title,
-                    duration: trackDuration,
-                    playedTo: startPosition + remainingTime
-                });
-                break;
-            }
-        }
-        
-        if (DEBUG() && missedTracks.length > 0) {
-            console.log('Calculated missed tracks:', missedTracks);
-        }
-        
-        return missedTracks;
-    }
-
-    // Get scrobbled IDs from localStorage
-    getScrobbled() {
-        try {
-            const stored = localStorage.getItem(this.scrobbledKey);
-            return stored ? new Set(JSON.parse(stored)) : new Set();
-        } catch (e) {
-            return new Set();
-        }
-    }
-
-    // Save scrobbled IDs
-    saveScrobbled(scrobbledIds) {
-        try {
-            localStorage.setItem(this.scrobbledKey, JSON.stringify([...scrobbledIds]));
-        } catch (e) {
-            console.error('Failed to save scrobbled IDs:', e);
-        }
-    }
-
-    // Add a scrobbled ID
-    addScrobbled(id) {
-        const scrobbled = this.getScrobbled();
-        scrobbled.add(id);
-        this.saveScrobbled(scrobbled);
-        return scrobbled;
-    }
-
-    // Clear old scrobbled IDs (keep last 100)
-    pruneScrobbled() {
-        const scrobbled = this.getScrobbled();
-        if (scrobbled.size > 100) {
-            const arr = [...scrobbled];
-            const keep = new Set(arr.slice(-100));
-            this.saveScrobbled(keep);
-            return keep;
-        }
-        return scrobbled;
-    }
-}
-
+// --- INITIAL STATE ---
 const initialState = {
     playlist: [],
     currentIndex: 0,
@@ -338,11 +194,12 @@ const initialState = {
     position: 0,
     lastStatusTs: 0,
     localTickStart: 0,
-    repeatMode: 'off',
+    repeatMode: 'off', // 'off', 'all', 'one'
     seeking: false,
     endHandledForId: null,
 };
 
+// --- Component for a single sortable queue item ---
 function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const isCurrent = index === currentIndex;
 
@@ -358,7 +215,7 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        touchAction: 'none',
+        touchAction: 'none', // Recommended for pointer sensors
     };
 
     const className = `qitem${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`;
@@ -396,30 +253,27 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
 }
 
 export default function App() {
+    // --- State variables ---
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [configForm, setConfigForm] = useState({ serverUrl: '', username: '', password: '' });
     const [searchResults, setSearchResults] = useState([]);
-    const [scrobbledIds, setScrobbledIds] = useState(new Set());
+    // --- REMOVED scrobbledIds state ---
 
+    // --- Refs ---
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
     const prevIndexRef = useRef(state.currentIndex);
-    const nowPlayingIdRef = useRef(null);
+    // --- REMOVED nowPlayingIdRef ---
     const repeatOneTriggeredRef = useRef(null);
-    const playbackManager = useRef(new PlaybackStateManager());
-    const lastVisibilityStateRef = useRef(!document.hidden);
+    // --- REMOVED playbackManager ref ---
+    // --- REMOVED lastVisibilityStateRef ---
 
     useEffect(() => { stateRef.current = state; }, [state]);
     
-    useEffect(() => {
-        // Load scrobbled IDs from localStorage on mount
-        const stored = playbackManager.current.getScrobbled();
-        setScrobbledIds(stored);
-        if (DEBUG()) console.log('Loaded scrobbled IDs:', stored.size);
-    }, []);
+    // --- REMOVED useEffect to load scrobbled IDs ---
 
     useEffect(() => {
         const fontLink = document.createElement('link');
@@ -429,6 +283,7 @@ export default function App() {
         return () => { document.head.removeChild(fontLink); };
     }, []);
 
+    // --- Media Session API ---
     const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
@@ -513,9 +368,10 @@ export default function App() {
         }
     }, []);
 
+    // --- Core State Refresh Logic ---
     const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
-            return null;
+            return null; // Return null if skipped
         }
 
         try {
@@ -549,18 +405,15 @@ export default function App() {
                 };
             });
 
-            setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
+            // Update status text only if it's not showing a temporary message like "Adding..."
+             setStatusText(prevStatus => {
+                 if (prevStatus.startsWith('Adding') || prevStatus.startsWith('Scrobbled') || prevStatus.startsWith('Error') || prevStatus.startsWith('Login')) {
+                     return prevStatus; // Keep temporary message
+                 }
+                 return status.playing ? '▶️ Playing' : '⏸️ Paused';
+             });
 
-            // Save state to localStorage
-            if (currentTrack && status.playing) {
-                playbackManager.current.saveState({
-                    currentTrack,
-                    currentIndex: status.currentIndex,
-                    position: status.position,
-                    playing: status.playing,
-                    playlist: newPlaylist
-                });
-            }
+            // --- REMOVED localStorage saving ---
 
             return {
                 trackId: currentTrack?.id,
@@ -578,73 +431,16 @@ export default function App() {
                 setStatusText(`Error: ${e.message}`);
             }
             console.error('Refresh failed:', e);
-            return null;
+            return null; // Return null on failure
         }
-    }, []);
+    }, []); // <-- Dependencies are correct
 
-    const scrobbleTrack = useCallback(async (trackId, title, duration, playedTo) => {
-        if (!trackId || duration <= 30) return false;
-        
-        // Check if already scrobbled
-        if (scrobbledIds.has(trackId)) {
-            if (DEBUG()) console.log(`Already scrobbled: ${title}`);
-            return false;
-        }
 
-        const isHalfway = playedTo >= duration / 2;
-        const isFourMinutes = playedTo >= 240;
+    // --- REMOVED scrobbleTrack ---
+    // --- REMOVED processMissedScrobbles ---
+    // --- REMOVED checkAndScrobble ---
 
-        if (isHalfway || isFourMinutes) {
-            if (DEBUG()) console.log(`✓ Scrobbling: ${title} (${playedTo.toFixed(1)}s/${duration}s)`);
-            await scrobble(trackId, true);
-            
-            // Update scrobbled IDs
-            const newScrobbled = playbackManager.current.addScrobbled(trackId);
-            setScrobbledIds(newScrobbled);
-            
-            return true;
-        }
-        
-        return false;
-    }, [scrobbledIds]);
-
-    const processMissedScrobbles = useCallback(async (savedState, currentState) => {
-        if (!savedState) return 0;
-        
-        const missedTracks = playbackManager.current.calculateMissedTracks(savedState, currentState);
-        
-        if (missedTracks.length === 0) {
-            if (DEBUG()) console.log('No missed tracks to scrobble');
-            return 0;
-        }
-
-        let scrobbleCount = 0;
-        
-        for (const track of missedTracks) {
-            const scrobbled = await scrobbleTrack(track.id, track.title, track.duration, track.playedTo);
-            if (scrobbled) {
-                scrobbleCount++;
-                // Rate limit between scrobbles
-                if (scrobbleCount < missedTracks.length) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-            }
-        }
-        
-        if (scrobbleCount > 0) {
-            console.log(`✓ Caught up: Scrobbled ${scrobbleCount} missed track(s)`);
-        }
-        
-        return scrobbleCount;
-    }, [scrobbleTrack]);
-
-    const checkAndScrobble = useCallback(async (freshData) => {
-        if (!freshData || !freshData.trackId || !freshData.playing) return;
-
-        const { trackId, title, duration, position } = freshData;
-        await scrobbleTrack(trackId, title, duration, position);
-    }, [scrobbleTrack]);
-
+    // --- Transport & Queue Actions ---
     const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
@@ -652,7 +448,7 @@ export default function App() {
         commandInProgress.current = true;
         try {
             await callJukebox('skip', `&index=${index}&offset=${Math.max(0, Math.floor(offsetSec))}`);
-            repeatOneTriggeredRef.current = null;
+            repeatOneTriggeredRef.current = null; // Ensure repeat trigger is reset
             await refreshState(true);
         } catch (e) {
             console.error(e);
@@ -669,18 +465,16 @@ export default function App() {
             if (action === 'play-pause') {
                 const cmd = currentState.playing ? 'stop' : 'start';
                 await callJukebox(cmd);
+                // Optimistically update playing state, refreshState will confirm
                 setState(prev => ({ ...prev, playing: !prev.playing }));
             } else if (action === 'next') {
                 await callJukebox('skip', `&index=${currentState.currentIndex + 1}&offset=0`);
-                 repeatOneTriggeredRef.current = null;
+                 repeatOneTriggeredRef.current = null; // Reset on skip
             } else if (action === 'previous') {
                 const restart = (currentState.position || 0) > 3;
-                if (restart) {
-                    await callJukebox('skip', `&index=${currentState.currentIndex}&offset=0`);
-                } else {
-                    await callJukebox('skip', `&index=${Math.max(0, currentState.currentIndex - 1)}&offset=0`);
-                }
-                 repeatOneTriggeredRef.current = null;
+                const targetIndex = restart ? currentState.currentIndex : Math.max(0, currentState.currentIndex - 1);
+                await callJukebox('skip', `&index=${targetIndex}&offset=0`);
+                 repeatOneTriggeredRef.current = null; // Reset on skip
             } else if (action === 'clear') {
                 if (!confirm('Clear the whole queue?')) {
                     commandInProgress.current = false;
@@ -695,13 +489,20 @@ export default function App() {
             } else if (action === 'addRandom') {
                 setStatusText('Adding random song…');
                 const { randomSong } = await addRandomSong();
+                // Start playback if queue was empty
                 if (!currentState.playing && currentState.playlist.length === 0) {
                     await callJukebox('start');
                 }
-                setStatusText(`Random song added: ${randomSong.title}!`);
+                setStatusText(`Added: ${randomSong.title}!`);
+                // Clear message after a delay
+                 setTimeout(() => {
+                     setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+                 }, 3000);
             }
 
+            // Always refresh state after an action
             await refreshState(true);
+            // Ensure status text reflects the final state after refresh
             setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
         } catch (e) {
             setStatusText(`Action failed: ${e.message}`);
@@ -718,7 +519,7 @@ export default function App() {
                 await skipTo(index, 0);
             } else if (action === 'remove') {
                 await callJukebox('remove', `&index=${index}`);
-                await refreshState(true);
+                await refreshState(true); // Refresh after removing
             }
         } catch(e) {
             console.error(e);
@@ -734,58 +535,14 @@ export default function App() {
         });
     }, []);
 
-    // ============ ENHANCED VISIBILITY CHANGE HANDLER ============
+    // --- SIMPLIFIED VISIBILITY CHANGE HANDLER ---
     useEffect(() => {
         const handleVisibilityChange = async () => {
-            const nowHidden = document.hidden;
-            const wasHidden = !lastVisibilityStateRef.current;
-            
-            if (!nowHidden && wasHidden && isAuthenticated) {
-                // Tab became visible after being hidden
-                if (DEBUG()) console.log('🔄 Tab became visible - checking for missed scrobbles...');
-                
-                // Load saved state
-                const savedState = playbackManager.current.loadState();
-                
-                // Get fresh state from server
-                const freshData = await refreshState(true);
-                
-                // Process missed scrobbles based on time elapsed
-                if (savedState && freshData) {
-                    const scrobbleCount = await processMissedScrobbles(savedState, stateRef.current);
-                    
-                    if (scrobbleCount > 0) {
-                        setStatusText(`✓ Caught up: ${scrobbleCount} track(s) scrobbled`);
-                        setTimeout(() => {
-                            setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
-                        }, 3000);
-                    }
-                }
-                
-                // Also check current track
-                await checkAndScrobble(freshData);
-                
-                // Prune old scrobbled IDs
-                const pruned = playbackManager.current.pruneScrobbled();
-                setScrobbledIds(pruned);
-            } else if (nowHidden && !wasHidden) {
-                // Tab became hidden - save current state
-                const currentState = stateRef.current;
-                const currentTrack = currentState.playlist[currentState.currentIndex];
-                
-                if (currentTrack && currentState.playing) {
-                    playbackManager.current.saveState({
-                        currentTrack,
-                        currentIndex: currentState.currentIndex,
-                        position: currentState.position,
-                        playing: currentState.playing,
-                        playlist: currentState.playlist
-                    });
-                    if (DEBUG()) console.log('💾 Tab hidden - state saved');
-                }
+            // Refresh state when tab becomes visible if authenticated
+            if (document.hidden === false && isAuthenticated) {
+                if (DEBUG()) console.log('🔄 Tab became visible - refreshing state');
+                await refreshState(true); // Force refresh
             }
-            
-            lastVisibilityStateRef.current = !nowHidden;
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -793,7 +550,7 @@ export default function App() {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [refreshState, isAuthenticated, checkAndScrobble, processMissedScrobbles]);
+    }, [refreshState, isAuthenticated]); // Dependencies are correct
 
     useEffect(() => {
         setupMediaSessionHandlers(handleTransport);
@@ -806,6 +563,7 @@ export default function App() {
         }
     }, [state.currentIndex, state.playlist, state.position, state.playing, updateMediaSession]);
 
+    // Initialization - try to reconnect
     useEffect(() => {
         let mounted = true;
 
@@ -822,23 +580,23 @@ export default function App() {
 
                     if (connected) {
                         setIsAuthenticated(true);
-                        await refreshState(true);
+                        await refreshState(true); // Force initial refresh
 
-                        const { playlist } = await callJukebox('get');
-                        const currentPlaylist = Array.isArray(playlist.entry) ? playlist.entry : (playlist.entry ? [playlist.entry] : []);
-
-                        if (mounted && currentPlaylist.length === 0) {
+                        // Add random songs if queue is empty after initial load
+                        const currentState = stateRef.current; // Get fresh state after refresh
+                        if (mounted && currentState.playlist.length === 0) {
+                            setStatusText('Adding initial songs...');
                             for (let i = 0; i < 3; i++) {
                                 if (!mounted) break;
                                 await addRandomSong();
                             }
                             if (mounted) {
-                                await refreshState(true);
+                                await refreshState(true); // Refresh again after adding
                             }
                         }
 
                         if (mounted) {
-                            setStatusText('Ready');
+                            setStatusText(stateRef.current.playing ? '▶️ Playing' : 'Ready');
                         }
                     } else {
                         setIsAuthenticated(false);
@@ -857,8 +615,9 @@ export default function App() {
         })();
 
         return () => { mounted = false; };
-    }, [refreshState]);
+    }, [refreshState]); // refreshState is the only dependency needed here
 
+    // Auto-remove finished songs (unchanged)
     useEffect(() => {
         const prevIndex = prevIndexRef.current;
         const currentIndex = state.currentIndex;
@@ -876,10 +635,13 @@ export default function App() {
                         if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s)`);
 
                         for (const index of indexesToRemove.reverse()) {
-                            await callJukebox('remove', `&index=${index}`);
+                            // Ensure index is still valid before removing
+                            if (index < stateRef.current.playlist.length) {
+                                await callJukebox('remove', `&index=${index}`);
+                            }
                         }
 
-                        await refreshState(true);
+                        await refreshState(true); // Refresh after removing
                     }
                 } catch (e) {
                     console.error('Failed to auto-remove finished song(s):', e);
@@ -891,51 +653,27 @@ export default function App() {
 
     }, [state.currentIndex, state.playlist.length, refreshState]);
 
-    // ============ POLLING WITH STATE PERSISTENCE ============
+    // --- REGULAR POLLING FOR STATE SYNC ---
     useEffect(() => {
         if (!isAuthenticated) return;
 
         const pollInterval = setInterval(async () => {
-            let freshData;
-            try {
-                freshData = await refreshState(false);
-            } catch (e) {
-                console.error("Background poll refresh failed:", e);
-                return;
-            }
-
-            // Save state after each successful poll
-            if (freshData && freshData.playing) {
-                const currentState = stateRef.current;
-                const currentTrack = currentState.playlist[currentState.currentIndex];
-                if (currentTrack) {
-                    playbackManager.current.saveState({
-                        currentTrack,
-                        currentIndex: currentState.currentIndex,
-                        position: currentState.position,
-                        playing: currentState.playing,
-                        playlist: currentState.playlist
-                    });
+            // Only refresh if not hidden and no command is in progress
+            if (!document.hidden && !commandInProgress.current) {
+                try {
+                    await refreshState(false); // Regular, non-forced refresh
+                } catch (e) {
+                    console.error("Background poll refresh failed:", e);
                 }
             }
-
-            await checkAndScrobble(freshData);
-        }, 2000);
+        }, 5000); // Poll every 5 seconds
 
         return () => clearInterval(pollInterval);
-    }, [refreshState, isAuthenticated, checkAndScrobble]);
+    }, [refreshState, isAuthenticated]); // Dependencies: only need refreshState and isAuthenticated
 
-    useEffect(() => {
-        const currentTrack = state.playlist[state.currentIndex];
-        if (state.playing && currentTrack && nowPlayingIdRef.current !== currentTrack.id) {
-            scrobble(currentTrack.id, false);
-            nowPlayingIdRef.current = currentTrack.id;
-        }
-        if (!state.playing) {
-            nowPlayingIdRef.current = null;
-        }
-    }, [state.playing, state.currentIndex, state.playlist]);
+    // --- REMOVED "Now Playing" update effect ---
 
+    // --- Position Ticker & Repeat Logic (unchanged) ---
     useEffect(() => {
         const tickInterval = setInterval(() => {
             const currentState = stateRef.current;
@@ -952,30 +690,30 @@ export default function App() {
             const dt = (Date.now() - lastStatusTs) / 1000;
             const pos = Math.min(dur, localTickStart + dt);
 
+            // Update visual position
             setState(prev => ({ ...prev, position: pos }));
 
+            // Repeat 'one' logic
             if (repeatMode === 'one' && dur > 1 && pos >= dur - 0.8 && repeatOneTriggeredRef.current !== tr.id) {
                 if (DEBUG()) console.log(`Repeat One Triggered for ${tr.title}`);
                 repeatOneTriggeredRef.current = tr.id;
-                skipTo(currentIndex, 0);
+                skipTo(currentIndex, 0); // Call skipTo without await
             }
 
-        }, 500);
+        }, 500); // UI ticks every 500ms
 
         return () => clearInterval(tickInterval);
-    }, [skipTo]);
+    }, [skipTo]); // skipTo dependency is correct
 
+
+    // --- Input Handlers (unchanged) ---
     const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
-
         setState(prev => ({ ...prev, gain }));
-
         try {
             await callJukebox('setGain', `&gain=${gain}`);
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     }, []);
 
     const handleSeekInput = useCallback((e) => {
@@ -984,14 +722,7 @@ export default function App() {
             const dur = Math.max(0, tr?.duration || 0);
             const fill = Number(e.target.value);
             const pos = (fill / 1000) * dur;
-
-            return {
-                ...prevState,
-                seeking: true,
-                position: pos,
-                localTickStart: pos,
-                lastStatusTs: Date.now(),
-            };
+            return { ...prevState, seeking: true, position: pos, localTickStart: pos, lastStatusTs: Date.now() };
         });
     }, []);
 
@@ -1000,7 +731,6 @@ export default function App() {
         const tr = currentState.playlist[currentState.currentIndex];
         const dur = Math.max(0, tr?.duration || 0);
         const pos = (Number(e.target.value) / 1000) * dur;
-
         setState(prev => ({ ...prev, seeking: false }));
         await skipTo(currentState.currentIndex, pos);
     }, [skipTo]);
@@ -1013,10 +743,7 @@ export default function App() {
                 try {
                     const results = await searchSongs(q);
                     setSearchResults(results);
-                } catch (e) {
-                    console.error('Search failed:', e);
-                    setSearchResults([]);
-                }
+                } catch (e) { console.error('Search failed:', e); setSearchResults([]); }
             }, 250);
         } else {
             setSearchResults([]);
@@ -1027,7 +754,6 @@ export default function App() {
     const addSongFromSearch = useCallback(async (id) => {
         const currentState = stateRef.current;
         commandInProgress.current = true;
-
         try {
             await callJukebox('add', `&id=${encodeURIComponent(id)}`);
             if (!currentState.playing && currentState.playlist.length === 0) {
@@ -1035,12 +761,9 @@ export default function App() {
             }
             setSearchQuery('');
             setSearchResults([]);
-            await refreshState(true);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            commandInProgress.current = false;
-        }
+            await refreshState(true); // Refresh after adding
+        } catch (e) { console.error(e); }
+        finally { commandInProgress.current = false; }
     }, [refreshState]);
 
     const handleConfigChange = useCallback((e) => {
@@ -1059,7 +782,7 @@ export default function App() {
             const currentState = stateRef.current;
             if (currentState.playlist.length === 0) { await handleTransport('addRandom'); }
             setStatusText(currentState.playing ? '▶️ Playing' : 'Ready');
-            setConfigForm(f => ({ ...f, password: '' }));
+            setConfigForm(f => ({ ...f, password: '' })); // Clear password field
         } catch (e) {
             setIsAuthenticated(false);
             setStatusText(`Login failed: ${e.message}`);
@@ -1067,33 +790,30 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
+    // --- DND-KIT SENSORS (unchanged) ---
     const sensors = useSensors(
         useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-          coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    // --- DND-KIT Drag End Handler (unchanged) ---
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
-
         if (over && active.id !== over.id) {
-
             const currentState = stateRef.current;
             const wasPlaying = currentState.playing;
             const currentTrack = currentState.playlist[currentState.currentIndex];
             const currentTrackId = currentTrack?.id;
 
-            const dur = Math.max(0, currentTrack?.duration || 0);
             let precisePosition = currentState.position;
-            if (wasPlaying) {
-                 const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
-                 precisePosition = Math.min(dur, currentState.localTickStart + dt);
+            if (wasPlaying && currentTrack) {
+                const dur = Math.max(0, currentTrack.duration || 0);
+                const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+                precisePosition = Math.min(dur, currentState.localTickStart + dt);
             }
             precisePosition = Math.floor(Math.max(0, precisePosition));
 
             const currentPlaylist = currentState.playlist;
-
             const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
             const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
 
@@ -1101,47 +821,40 @@ export default function App() {
 
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
 
-            setState(prev => ({
-              ...prev,
-              playlist: newPlaylist,
-              playing: wasPlaying
-            }));
+            // Optimistically update UI
+            setState(prev => ({ ...prev, playlist: newPlaylist, playing: wasPlaying }));
 
             const ids = newPlaylist.map(song => song.id);
             const qs = ids.map(id => `&id=${encodeURIComponent(id)}`).join('');
 
             try {
                 commandInProgress.current = true;
-
                 await callJukebox('set', qs);
-                await new Promise(resolve => setTimeout(resolve, 50));
+                await new Promise(resolve => setTimeout(resolve, 50)); // Short delay
 
-                const newPlayingIndex = currentTrackId
-                    ? newPlaylist.findIndex(song => song.id === currentTrackId)
-                    : -1;
+                const newPlayingIndex = currentTrackId ? newPlaylist.findIndex(song => song.id === currentTrackId) : -1;
 
                 if (newPlayingIndex !== -1) {
                     await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`);
-
-                    if (wasPlaying) {
-                        await callJukebox('start');
-                    }
-                } else if (wasPlaying) {
-                     await callJukebox('skip', `&index=0&offset=0`);
-                     await callJukebox('start');
+                    if (wasPlaying) { await callJukebox('start'); }
+                } else if (wasPlaying) { // Fallback if track was removed during drag?
+                    await callJukebox('skip', `&index=0&offset=0`);
+                    await callJukebox('start');
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 150));
+                await new Promise(resolve => setTimeout(resolve, 150)); // Longer delay before final sync
                 await refreshState(true);
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
-                await refreshState(true);
+                await refreshState(true); // Revert UI on error
             } finally {
                 commandInProgress.current = false;
             }
         }
     }, [refreshState]);
 
+
+    // --- Derived State (unchanged) ---
     const currentTrack = state.playlist[state.currentIndex];
 
     const seekValue = useMemo(() => {
@@ -1165,6 +878,8 @@ export default function App() {
         return 'Repeat Off';
     }, [state.repeatMode]);
 
+
+    // --- RENDER (unchanged) ---
     return (
         <>
             <div className="player-shell">
@@ -1294,7 +1009,7 @@ export default function App() {
                         </div>
                         <div className="small">
                             {isAuthenticated
-                                ? '✓ Connected. Scrobbles are saved persistently.'
+                                ? '✓ Connected. Navidrome handles scrobbles.' // Updated message
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
                         </div>
                     </div>
