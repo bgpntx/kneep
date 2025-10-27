@@ -734,6 +734,15 @@ export default function App() {
         });
     }, []);
 
+    // ============ QUEUE TOTAL DURATION ============
+    const totalQueueSeconds = useMemo(() => {
+        return state.playlist.reduce((sum, song) => {
+            return sum + (Number(song.duration) || 0);
+        }, 0);
+    }, [state.playlist]);
+
+    const totalQueueTimeStr = useMemo(() => fmtTime(totalQueueSeconds), [totalQueueSeconds]);
+
     // ============ ENHANCED VISIBILITY CHANGE HANDLER ============
     useEffect(() => {
         const handleVisibilityChange = async () => {
@@ -1236,7 +1245,7 @@ export default function App() {
                 </div>
 
                 <aside className="side-card">
-                    <h3>Queue</h3>
+                    <h3>Queue <small>(Total: {totalQueueTimeStr})</small></h3>
                     
                     <DndContext 
                         sensors={sensors}
