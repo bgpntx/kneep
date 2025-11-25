@@ -393,7 +393,7 @@ const initialState = {
     lastPlayingTrackId: null, // Track the last playing track for auto-remove
 };
 
-function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
+function JukeboxQueueItem({ song, index, displayNum, currentIndex, onAction, id }) {
     const isCurrent = index === currentIndex;
 
     const {
@@ -422,7 +422,7 @@ function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
             className={className}
             data-index={index}
         >
-            <div className="idx">{index + 1}</div>
+            <div className="idx">{displayNum}</div>
             <div>
                 <div className="qi-title">{escapeHtml(song.title || 'Unknown')}</div>
                 <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
@@ -809,11 +809,16 @@ export default function App() {
         });
     }, []);
 
+    const upcomingCount = useMemo(() => {
+        return Math.max(0, state.playlist.length - state.currentIndex - 1);
+    }, [state.playlist.length, state.currentIndex]);
+
     const totalQueueSeconds = useMemo(() => {
-        return state.playlist.reduce((sum, song) => {
+        // Only count upcoming tracks (after current)
+        return state.playlist.slice(state.currentIndex + 1).reduce((sum, song) => {
             return sum + (Number(song.duration) || 0);
         }, 0);
-    }, [state.playlist]);
+    }, [state.playlist, state.currentIndex]);
 
     const totalQueueTimeStr = useMemo(() => formatDuration(totalQueueSeconds), [totalQueueSeconds]);
     
@@ -1229,7 +1234,7 @@ export default function App() {
                 <div className="transport-card">
                      <div className="status-row">
                         <div id="statusText">{statusText}</div>
-                        <div className="small">Queue: <span id="queueCount">{state.playlist.length}</span> tracks</div>
+                        <div className="small">Up next: <span id="queueCount">{upcomingCount}</span> tracks</div>
                     </div>
                     <div className="controls">
                       <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
@@ -1277,7 +1282,7 @@ export default function App() {
                 </div>
 
                 <aside className="side-card">
-                    <h3>Queue <small>(Total: {totalQueueTimeStr})</small></h3>
+                    <h3>Up Next <small>(Total: {totalQueueTimeStr})</small></h3>
                     
                     <DndContext 
                         sensors={sensors}
@@ -1289,16 +1294,23 @@ export default function App() {
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
-                                {state.playlist.map((song, index) => (
-                                    <JukeboxQueueItem 
-                                        key={song.id} 
-                                        id={song.id}  
-                                        song={song}
-                                        index={index} 
-                                        currentIndex={state.currentIndex}
-                                        onAction={handleQueueAction}
-                                    />
-                                ))}
+                                {state.playlist.map((song, index) => {
+                                    // Skip the currently playing track - it's shown in the cover card
+                                    if (index === state.currentIndex) return null;
+                                    // Calculate display number: tracks before current keep their number, tracks after are renumbered
+                                    const displayNum = index < state.currentIndex ? index + 1 : index - state.currentIndex;
+                                    return (
+                                        <JukeboxQueueItem 
+                                            key={song.id} 
+                                            id={song.id}  
+                                            song={song}
+                                            index={index}
+                                            displayNum={displayNum}
+                                            currentIndex={state.currentIndex}
+                                            onAction={handleQueueAction}
+                                        />
+                                    );
+                                })}
                             </div>
                         </SortableContext>
                     </DndContext>
