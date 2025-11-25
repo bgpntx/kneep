@@ -1,4 +1,4 @@
-// src/App.jsx - FIXED: Enhanced scrobbling with localStorage persistence and comprehensive visibility handling
+// src/App.jsx - v2: Clear button, auto-remove played tracks, cache versioning
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
@@ -19,9 +19,35 @@ import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
 const API_VERSION = '1.16.1';
+const CACHE_VERSION = 'v2'; // Increment this to invalidate old cache
 const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
 
-let config = JSON.parse(localStorage.getItem('jukeboxConfig')) || {
+// Cache key helpers with versioning
+const cacheKey = (key) => `jukebox_${CACHE_VERSION}_${key}`;
+
+// Clear old cache versions on load
+function clearOldCache() {
+    const keysToCheck = ['jukeboxConfig', 'jukeboxPlaybackState', 'jukeboxScrobbled'];
+    keysToCheck.forEach(key => {
+        if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+            if (DEBUG()) console.log(`Cleared old cache key: ${key}`);
+        }
+    });
+    // Clear any old versioned keys
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('jukebox_') && !key.startsWith(`jukebox_${CACHE_VERSION}_`)) {
+            localStorage.removeItem(key);
+            if (DEBUG()) console.log(`Cleared old versioned cache: ${key}`);
+        }
+    }
+}
+
+// Initialize cache cleanup
+clearOldCache();
+
+let config = JSON.parse(localStorage.getItem(cacheKey('config'))) || {
     serverUrl: '',
     username: '',
     token: '',
@@ -90,7 +116,7 @@ function generateToken(password, salt) { return md5(password + salt); }
 function isSessionValid() { return !!(config.token && config.salt && config.username); }
 function clearSession() {
     const serverUrl = config.serverUrl;
-    localStorage.removeItem('jukeboxConfig');
+    localStorage.removeItem(cacheKey('config'));
     config = { serverUrl: serverUrl, username: '', token: '', salt: '' };
     if (DEBUG()) console.log('Session cleared');
 }
@@ -177,7 +203,7 @@ async function authenticate(serverUrl, username, password) {
     const resp = data?.['subsonic-response'];
     if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Authentication failed'; throw new Error(errorMsg); }
     config = { serverUrl, username, token, salt };
-    localStorage.setItem('jukeboxConfig', JSON.stringify(config));
+    localStorage.setItem(cacheKey('config'), JSON.stringify(config));
     if (DEBUG()) { console.log('Authentication successful'); console.log('Token:', token); console.log('Salt:', salt); }
     return config;
 }
@@ -196,7 +222,7 @@ function fmtTime(sec) {
 function formatDuration(sec) {
     sec = Math.max(0, Math.floor(sec));
     
-    const days = Math.floor(sec / 86400); // 86400 seconds in a day
+    const days = Math.floor(sec / 86400);
     sec %= 86400;
     
     const hours = Math.floor(sec / 3600);
@@ -222,11 +248,10 @@ function formatDuration(sec) {
 // ============ ENHANCED PLAYBACK STATE MANAGEMENT ============
 class PlaybackStateManager {
     constructor() {
-        this.storageKey = 'jukeboxPlaybackState';
-        this.scrobbledKey = 'jukeboxScrobbled';
+        this.storageKey = cacheKey('playbackState');
+        this.scrobbledKey = cacheKey('scrobbled');
     }
 
-    // Save current playback state to localStorage
     saveState(state) {
         try {
             const saveData = {
@@ -250,26 +275,30 @@ class PlaybackStateManager {
         }
     }
 
-    // Load previously saved state
     loadState() {
         try {
             const stored = localStorage.getItem(this.storageKey);
             if (!stored) return null;
             const data = JSON.parse(stored);
+            // Validate timestamp - discard if older than 24 hours
+            if (data.timestamp && (Date.now() - data.timestamp) > 86400000) {
+                localStorage.removeItem(this.storageKey);
+                return null;
+            }
             if (DEBUG()) console.log('State loaded from localStorage:', data);
             return data;
         } catch (e) {
             console.error('Failed to load state:', e);
+            localStorage.removeItem(this.storageKey);
             return null;
         }
     }
 
-    // Calculate what should have played based on elapsed time
     calculateMissedTracks(savedState, currentState) {
         if (!savedState || !savedState.playing) return [];
         
-        const elapsed = (Date.now() - savedState.timestamp) / 1000; // seconds
-        if (elapsed < 30) return []; // Too short to matter
+        const elapsed = (Date.now() - savedState.timestamp) / 1000;
+        if (elapsed < 30) return [];
         
         if (DEBUG()) console.log(`Time elapsed since last save: ${elapsed.toFixed(0)}s`);
         
@@ -278,7 +307,6 @@ class PlaybackStateManager {
         let checkIndex = savedState.currentIndex;
         let startPosition = savedState.position || 0;
         
-        // Calculate what should have finished playing
         while (remainingTime > 0 && checkIndex < savedState.queueSnapshot.length) {
             const track = savedState.queueSnapshot[checkIndex];
             if (!track) break;
@@ -287,7 +315,6 @@ class PlaybackStateManager {
             const timeLeftInTrack = trackDuration - startPosition;
             
             if (remainingTime >= timeLeftInTrack) {
-                // This track should have finished
                 missedTracks.push({
                     id: track.id,
                     title: track.title,
@@ -298,7 +325,6 @@ class PlaybackStateManager {
                 checkIndex++;
                 startPosition = 0;
             } else {
-                // We're still in this track
                 missedTracks.push({
                     id: track.id,
                     title: track.title,
@@ -316,17 +342,16 @@ class PlaybackStateManager {
         return missedTracks;
     }
 
-    // Get scrobbled IDs from localStorage
     getScrobbled() {
         try {
             const stored = localStorage.getItem(this.scrobbledKey);
             return stored ? new Set(JSON.parse(stored)) : new Set();
         } catch (e) {
+            localStorage.removeItem(this.scrobbledKey);
             return new Set();
         }
     }
 
-    // Save scrobbled IDs
     saveScrobbled(scrobbledIds) {
         try {
             localStorage.setItem(this.scrobbledKey, JSON.stringify([...scrobbledIds]));
@@ -335,7 +360,6 @@ class PlaybackStateManager {
         }
     }
 
-    // Add a scrobbled ID
     addScrobbled(id) {
         const scrobbled = this.getScrobbled();
         scrobbled.add(id);
@@ -343,7 +367,6 @@ class PlaybackStateManager {
         return scrobbled;
     }
 
-    // Clear old scrobbled IDs (keep last 100)
     pruneScrobbled() {
         const scrobbled = this.getScrobbled();
         if (scrobbled.size > 100) {
@@ -367,6 +390,7 @@ const initialState = {
     repeatMode: 'off',
     seeking: false,
     endHandledForId: null,
+    lastPlayingTrackId: null, // Track the last playing track for auto-remove
 };
 
 function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
@@ -432,7 +456,7 @@ export default function App() {
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
-    const prevIndexRef = useRef(state.currentIndex);
+    const prevTrackIdRef = useRef(null); // Changed from prevIndexRef to track by ID
     const nowPlayingIdRef = useRef(null);
     const repeatOneTriggeredRef = useRef(null);
     const playbackManager = useRef(new PlaybackStateManager());
@@ -441,7 +465,6 @@ export default function App() {
     useEffect(() => { stateRef.current = state; }, [state]);
     
     useEffect(() => {
-        // Load scrobbled IDs from localStorage on mount
         const stored = playbackManager.current.getScrobbled();
         setScrobbledIds(stored);
         if (DEBUG()) console.log('Loaded scrobbled IDs:', stored.size);
@@ -539,6 +562,31 @@ export default function App() {
         }
     }, []);
 
+    // Auto-remove finished track from queue
+    const removeFinishedTrack = useCallback(async (trackId) => {
+        if (!trackId || commandInProgress.current) return;
+        
+        const currentState = stateRef.current;
+        const trackIndex = currentState.playlist.findIndex(t => t.id === trackId);
+        
+        if (trackIndex === -1 || trackIndex >= currentState.currentIndex) {
+            // Track not found or hasn't been passed yet
+            return;
+        }
+        
+        if (DEBUG()) console.log(`Auto-removing finished track at index ${trackIndex}: ${trackId}`);
+        
+        try {
+            commandInProgress.current = true;
+            await callJukebox('remove', `&index=${trackIndex}`);
+            // State will be updated by the next refresh
+        } catch (e) {
+            console.error('Failed to auto-remove track:', e);
+        } finally {
+            commandInProgress.current = false;
+        }
+    }, []);
+
     const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
             return null;
@@ -553,10 +601,17 @@ export default function App() {
                 : (playlist?.entry ? [playlist.entry] : []);
             
             const currentTrack = newPlaylist[status.currentIndex || 0];
+            const prevState = stateRef.current;
+            const prevTrack = prevState.playlist[prevState.currentIndex];
+
+            // Detect track change for auto-remove
+            if (prevTrack && currentTrack && prevTrack.id !== currentTrack.id) {
+                // Track changed - schedule removal of previous track
+                // Use setTimeout to avoid blocking the state update
+                setTimeout(() => removeFinishedTrack(prevTrack.id), 100);
+            }
 
             setState(prevState => {
-                const prevTrack = prevState.playlist[prevState.currentIndex];
-
                 if (currentTrack?.id !== prevTrack?.id) {
                     repeatOneTriggeredRef.current = null;
                 }
@@ -571,13 +626,13 @@ export default function App() {
                     lastStatusTs: Date.now(),
                     localTickStart: status.position,
                     endHandledForId: currentTrack?.id !== prevTrack?.id ? null : prevState.endHandledForId,
-                    repeatMode: prevState.repeatMode
+                    repeatMode: prevState.repeatMode,
+                    lastPlayingTrackId: currentTrack?.id
                 };
             });
 
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
 
-            // Save state to localStorage
             if (currentTrack && status.playing) {
                 playbackManager.current.saveState({
                     currentTrack,
@@ -606,12 +661,11 @@ export default function App() {
             console.error('Refresh failed:', e);
             return null;
         }
-    }, []);
+    }, [removeFinishedTrack]);
 
     const scrobbleTrack = useCallback(async (trackId, title, duration, playedTo) => {
         if (!trackId || duration <= 30) return false;
         
-        // Check if already scrobbled
         if (scrobbledIds.has(trackId)) {
             if (DEBUG()) console.log(`Already scrobbled: ${title}`);
             return false;
@@ -624,7 +678,6 @@ export default function App() {
             if (DEBUG()) console.log(`✓ Scrobbling: ${title} (${playedTo.toFixed(1)}s/${duration}s)`);
             await scrobble(trackId, true);
             
-            // Update scrobbled IDs
             const newScrobbled = playbackManager.current.addScrobbled(trackId);
             setScrobbledIds(newScrobbled);
             
@@ -650,7 +703,6 @@ export default function App() {
             const scrobbled = await scrobbleTrack(track.id, track.title, track.duration, track.playedTo);
             if (scrobbled) {
                 scrobbleCount++;
-                // Rate limit between scrobbles
                 if (scrobbleCount < missedTracks.length) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
@@ -708,11 +760,8 @@ export default function App() {
                 }
                  repeatOneTriggeredRef.current = null;
             } else if (action === 'clear') {
-                if (!confirm('Clear the whole queue?')) {
-                    commandInProgress.current = false;
-                    return;
-                }
                 await callJukebox('clear');
+                setStatusText('Queue cleared');
             } else if (action === 'shuffle') {
                 await callJukebox('shuffle');
             } else if (action === 'stop') {
@@ -760,7 +809,6 @@ export default function App() {
         });
     }, []);
 
-    // ============ QUEUE TOTAL DURATION ============
     const totalQueueSeconds = useMemo(() => {
         return state.playlist.reduce((sum, song) => {
             return sum + (Number(song.duration) || 0);
@@ -769,23 +817,17 @@ export default function App() {
 
     const totalQueueTimeStr = useMemo(() => formatDuration(totalQueueSeconds), [totalQueueSeconds]);
     
-    // ============ ENHANCED VISIBILITY CHANGE HANDLER ============
     useEffect(() => {
         const handleVisibilityChange = async () => {
             const nowHidden = document.hidden;
             const wasHidden = !lastVisibilityStateRef.current;
             
             if (!nowHidden && wasHidden && isAuthenticated) {
-                // Tab became visible after being hidden
                 if (DEBUG()) console.log('🔄 Tab became visible - checking for missed scrobbles...');
                 
-                // Load saved state
                 const savedState = playbackManager.current.loadState();
-                
-                // Get fresh state from server
                 const freshData = await refreshState(true);
                 
-                // Process missed scrobbles based on time elapsed
                 if (savedState && freshData) {
                     const scrobbleCount = await processMissedScrobbles(savedState, stateRef.current);
                     
@@ -797,14 +839,11 @@ export default function App() {
                     }
                 }
                 
-                // Also check current track
                 await checkAndScrobble(freshData);
                 
-                // Prune old scrobbled IDs
                 const pruned = playbackManager.current.pruneScrobbled();
                 setScrobbledIds(pruned);
             } else if (nowHidden && !wasHidden) {
-                // Tab became hidden - save current state
                 const currentState = stateRef.current;
                 const currentTrack = currentState.playlist[currentState.currentIndex];
                 
@@ -895,39 +934,6 @@ export default function App() {
     }, [refreshState]);
 
     useEffect(() => {
-        const prevIndex = prevIndexRef.current;
-        const currentIndex = state.currentIndex;
-
-        if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
-
-            (async () => {
-                try {
-                    const indexesToRemove = [];
-                    for (let i = prevIndex; i < currentIndex; i++) {
-                        indexesToRemove.push(i);
-                    }
-
-                    if (indexesToRemove.length > 0) {
-                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s)`);
-
-                        for (const index of indexesToRemove.reverse()) {
-                            await callJukebox('remove', `&index=${index}`);
-                        }
-
-                        await refreshState(true);
-                    }
-                } catch (e) {
-                    console.error('Failed to auto-remove finished song(s):', e);
-                }
-            })();
-        }
-
-        prevIndexRef.current = currentIndex;
-
-    }, [state.currentIndex, state.playlist.length, refreshState]);
-
-    // ============ POLLING WITH STATE PERSISTENCE ============
-    useEffect(() => {
         if (!isAuthenticated) return;
 
         const pollInterval = setInterval(async () => {
@@ -939,7 +945,6 @@ export default function App() {
                 return;
             }
 
-            // Save state after each successful poll
             if (freshData && freshData.playing) {
                 const currentState = stateRef.current;
                 const currentTrack = currentState.playlist[currentState.currentIndex];
@@ -1241,6 +1246,7 @@ export default function App() {
                        </button>
                       <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
                       <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
+                      <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
                     </div>
 
                     <div className="progress">
@@ -1329,7 +1335,7 @@ export default function App() {
                         </div>
                         <div className="small">
                             {isAuthenticated
-                                ? '✓ Connected. Scrobbles are saved persistently.'
+                                ? '✓ Connected. Played tracks auto-removed.'
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
                         </div>
                     </div>
