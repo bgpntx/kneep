@@ -7,8 +7,8 @@ pipeline {
         DEPLOY_USER   = 'bug'
         DEPLOY_PATH   = '/home/bug/git/kneep'
         DEPLOY_BRANCH = 'dev'
-        // This pulls the secret text credential named 'discord' into the env variable
-        DISCORD_URL   = credentials('discord')
+        // This pulls the secret text credential named 'discord_bug' into the env variable
+        DISCORD_URL   = credentials('discord_bug')
     }
 
     stages {
