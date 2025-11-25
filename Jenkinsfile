@@ -2,11 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_HOST   = 'nest.vps.pw'
-        DEPLOY_PORT   = '2562'
-        DEPLOY_USER   = 'bug'
-        DEPLOY_PATH   = '/home/bug/git/kneep'
-        DEPLOY_BRANCH = 'dev'
+        DEPLOY_HOST   = "${env.PROD_IP_KNEEP}"
+        DEPLOY_PORT   = "${env.PROD_PORT_KNEEP}"
+        DEPLOY_USER   = "${env.PROD_USER_KNEEP}"
+        DEPLOY_PATH   = "${env.DEPLOY_PATH_KNEEP}"
+        DEPLOY_BRANCH = "${env.DEPLOY_BRANCH_KNEEP}"
         // This pulls the secret text credential named 'discord_bug' into the env variable
         DISCORD_URL   = credentials('discord_bug')
     }
