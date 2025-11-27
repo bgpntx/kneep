@@ -1295,10 +1295,10 @@ export default function App() {
                         >
                             <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
                                 {state.playlist.map((song, index) => {
-                                    // Skip the currently playing track - it's shown in the cover card
-                                    if (index === state.currentIndex) return null;
-                                    // Calculate display number: tracks before current keep their number, tracks after are renumbered
-                                    const displayNum = index < state.currentIndex ? index + 1 : index - state.currentIndex;
+                                    // Only show tracks AFTER the current one (the actual "up next")
+                                    if (index <= state.currentIndex) return null;
+                                    // Number sequentially starting from 1
+                                    const displayNum = index - state.currentIndex;
                                     return (
                                         <JukeboxQueueItem 
                                             key={song.id} 
