@@ -1,4 +1,4 @@
-// src/App.jsx - v2: Clear button, auto-remove played tracks, cache versioning
+// src/App.jsx - v3: Fixed queue numbering and duplicate song keys
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
@@ -456,7 +456,7 @@ export default function App() {
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
-    const prevTrackIdRef = useRef(null); // Changed from prevIndexRef to track by ID
+    const prevTrackIdRef = useRef(null);
     const nowPlayingIdRef = useRef(null);
     const repeatOneTriggeredRef = useRef(null);
     const playbackManager = useRef(new PlaybackStateManager());
@@ -1119,6 +1119,11 @@ export default function App() {
         })
     );
 
+    // Generate unique keys for queue items (handles duplicate songs)
+    const queueItemIds = useMemo(() => {
+        return state.playlist.map((song, index) => `${song.id}-${index}`);
+    }, [state.playlist]);
+
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
@@ -1139,10 +1144,11 @@ export default function App() {
 
             const currentPlaylist = currentState.playlist;
 
-            const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
-            const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
+            // Parse composite IDs to get actual indices
+            const oldIndex = parseInt(active.id.toString().split('-').pop(), 10);
+            const newIndex = parseInt(over.id.toString().split('-').pop(), 10);
 
-            if (oldIndex === -1 || newIndex === -1) return;
+            if (isNaN(oldIndex) || isNaN(newIndex) || oldIndex === newIndex) return;
 
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
 
@@ -1290,7 +1296,7 @@ export default function App() {
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext 
-                            items={state.playlist.map(s => s.id)} 
+                            items={queueItemIds} 
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
@@ -1299,10 +1305,11 @@ export default function App() {
                                     if (index <= state.currentIndex) return null;
                                     // Number sequentially starting from 1
                                     const displayNum = index - state.currentIndex;
+                                    const itemId = `${song.id}-${index}`;
                                     return (
                                         <JukeboxQueueItem 
-                                            key={song.id} 
-                                            id={song.id}  
+                                            key={itemId} 
+                                            id={itemId}  
                                             song={song}
                                             index={index}
                                             displayNum={displayNum}
