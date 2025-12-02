@@ -1,4 +1,4 @@
-// src/App.jsx - v3: Fixed queue numbering and duplicate song keys
+// src/App.jsx - v4: Fixed playback pause on tab switch
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
@@ -461,6 +461,8 @@ export default function App() {
     const repeatOneTriggeredRef = useRef(null);
     const playbackManager = useRef(new PlaybackStateManager());
     const lastVisibilityStateRef = useRef(!document.hidden);
+    // v4: Flag to prevent auto-remove during visibility recovery
+    const isRecoveringFromHiddenRef = useRef(false);
 
     useEffect(() => { stateRef.current = state; }, [state]);
     
@@ -604,11 +606,11 @@ export default function App() {
             const prevState = stateRef.current;
             const prevTrack = prevState.playlist[prevState.currentIndex];
 
-            // Detect track change for auto-remove
+            // v4: Detect track change for auto-remove (skip during visibility recovery)
             if (prevTrack && currentTrack && prevTrack.id !== currentTrack.id) {
-                // Track changed - schedule removal of previous track
-                // Use setTimeout to avoid blocking the state update
-                setTimeout(() => removeFinishedTrack(prevTrack.id), 100);
+                if (!isRecoveringFromHiddenRef.current) {
+                    setTimeout(() => removeFinishedTrack(prevTrack.id), 100);
+                }
             }
 
             setState(prevState => {
@@ -830,8 +832,17 @@ export default function App() {
             if (!nowHidden && wasHidden && isAuthenticated) {
                 if (DEBUG()) console.log('🔄 Tab became visible - checking for missed scrobbles...');
                 
+                // v4: Disable auto-remove during recovery to prevent playback disruption
+                isRecoveringFromHiddenRef.current = true;
+                
                 const savedState = playbackManager.current.loadState();
                 const freshData = await refreshState(true);
+                
+                // v4: Re-enable auto-remove after state is synced
+                setTimeout(() => {
+                    isRecoveringFromHiddenRef.current = false;
+                    if (DEBUG()) console.log('🔄 Recovery complete, auto-remove re-enabled');
+                }, 500);
                 
                 if (savedState && freshData) {
                     const scrobbleCount = await processMissedScrobbles(savedState, stateRef.current);
