@@ -46,8 +46,8 @@ services:
     volumes:
       - ./dist:/usr/share/nginx/html:ro
       - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt/archive/nest.vps.pw/fullchain3.pem:/etc/nginx/ssl/fullchain.pem:ro
-      - /etc/letsencrypt/archive/nest.vps.pw/privkey3.pem:/etc/nginx/ssl/privkey.pem:ro
+      - /etc/letsencrypt/live/nest.vps.pw/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/live/nest.vps.pw/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
     environment:
       SSL_CERTIFICATE: /etc/nginx/ssl/fullchain.pem
       SSL_CERTIFICATE_KEY: /etc/nginx/ssl/privkey.pem
