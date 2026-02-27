@@ -11,7 +11,7 @@ echo ">>> Cleaning old build..."
 rm -rf node_modules dist
 
 echo ">>> Installing dependencies..."
-npm install
+npm ci
 
 echo ">>> Auditing packages..."
 npm audit fix || true   # allow audit to fail without aborting

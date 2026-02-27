@@ -21,14 +21,18 @@ function clearOldCache() {
             if (DEBUG()) console.log(`Cleared old cache key: ${key}`);
         }
     });
-    // Clear any old versioned keys
+    // Clear any old versioned keys (collect first to avoid index-shift bug)
+    const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('jukebox_') && !key.startsWith(`jukebox_${CACHE_VERSION}_`)) {
-            localStorage.removeItem(key);
-            if (DEBUG()) console.log(`Cleared old versioned cache: ${key}`);
+            keysToRemove.push(key);
         }
     }
+    keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        if (DEBUG()) console.log(`Cleared old versioned cache: ${key}`);
+    });
 }
 
 // Initialize cache cleanup
@@ -67,20 +71,18 @@ export function coverArtUrl(id, size = 512) {
 export async function callJukebox(action, extra = '') {
     if (!isSessionValid()) throw new Error('Not authenticated');
     const url = buildJukeboxUrl(action, extra);
-    try {
-        const res = await fetch(url);
-        if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        const data = await res.json();
-        if (DEBUG()) console.log(`API ${action} response:`, data);
-        const resp = data?.['subsonic-response'];
-        if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Unknown API error'; throw new Error(`API failed: ${errorMsg}`); }
-        const playlistObj = resp.jukeboxPlaylist || {};
-        const statusObj = resp.jukeboxStatus || playlistObj;
-        const status = { currentIndex: statusObj.currentIndex ?? 0, playing: statusObj.playing ?? false, gain: statusObj.gain ?? 1, position: statusObj.position ?? 0, };
-        const playlist = { entry: playlistObj.entry || [] };
-        return { status, playlist };
-    } catch (error) { if (error.message === 'Authentication failed') { throw error; } throw error; }
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    if (DEBUG()) console.log(`API ${action} response:`, data);
+    const resp = data?.['subsonic-response'];
+    if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Unknown API error'; throw new Error(`API failed: ${errorMsg}`); }
+    const playlistObj = resp.jukeboxPlaylist || {};
+    const statusObj = resp.jukeboxStatus || playlistObj;
+    const status = { currentIndex: statusObj.currentIndex ?? 0, playing: statusObj.playing ?? false, gain: statusObj.gain ?? 1, position: statusObj.position ?? 0, };
+    const playlist = { entry: playlistObj.entry || [] };
+    return { status, playlist };
 }
 
 export async function getRandomSongFromServer() {
@@ -144,7 +146,7 @@ export async function authenticate(serverUrl, username, password) {
     if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Authentication failed'; throw new Error(errorMsg); }
     config = { serverUrl, username, token, salt };
     localStorage.setItem(cacheKey('config'), JSON.stringify(config));
-    if (DEBUG()) { console.log('Authentication successful'); console.log('Token:', token); console.log('Salt:', salt); }
+    if (DEBUG()) { console.log('Authentication successful'); }
     return config;
 }
 

@@ -19,7 +19,7 @@ pipeline {
                 sshagent(['deploy-ssh']) {
                     sh """
                         # Connect to remote server
-                        ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
+                        ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=accept-new ${DEPLOY_USER}@${DEPLOY_HOST} "
                             # Stop script on first error
                             set -e
                             

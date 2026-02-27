@@ -59,7 +59,6 @@ export default function App() {
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
-    const prevTrackIdRef = useRef(null);
     const nowPlayingIdRef = useRef(null);
     const repeatOneTriggeredRef = useRef(null);
     const playbackManager = useRef(new PlaybackStateManager());
