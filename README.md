@@ -1,562 +1,198 @@
-# Navidrome Jukebox Web Player
+# 🎵 Kneep — Navidrome Jukebox Web Player
 
-A modern, beautiful web interface for controlling [Navidrome](https://www.navidrome.org/)'s Jukebox mode. Control music playback on your server from any device with a sleek, responsive UI.
+A retro-styled web interface for controlling [Navidrome](https://www.navidrome.org/)'s Jukebox mode. Manage music playback on your server from any device — with a classic Winamp aesthetic.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![React](https://img.shields.io/badge/React-18.2-61dafb.svg)
 ![Vite](https://img.shields.io/badge/Vite-5.2-646cff.svg)
 
-## 🎵 Features
+## Features
 
-- **🎛️ Full Jukebox Control** - Play, pause, skip, shuffle, and manage your music queue
-- **🔍 Real-time Search** - Search your entire music library and add songs instantly
-- ~~**🎨 Modern UI** - Beautiful glassmorphic design with smooth animations~~ Old classic Winamp style 😜
-- **📱 Responsive** - Works seamlessly on desktop, tablet, and mobile devices
-- **🎚️ Volume Control** - Adjust playback volume remotely
-- **🔁 Repeat Modes** - Repeat off, repeat all, or repeat one track
-- **🎲 Random Song** - Add random songs to your queue with one click
-- **⏱️ Live Progress** - Real-time playback position and duration tracking
-- **🖼️ Album Art** - High-quality cover art display
-- **🔒 HTTPS Support** - Secure connection with Let's Encrypt certificates
-- **🐳 Docker Ready** - Easy deployment with Docker Compose
+- ~~**🎨 Modern UI** — Beautiful glassmorphic design with smooth animations~~ Old classic Winamp style 😜
+- **Jukebox Control** — Play, pause, skip, shuffle, repeat, volume
+- **Drag & Drop Queue** — Reorder your playlist with drag and drop
+- **Library Search** — Real-time search, click to add
+- **Random Song** — Add random tracks with one click
+- **Last.fm Scrobbling** — Automatic scrobble with tab-hidden catch-up
+- **Album Art** — High-quality cover art display
+- **Media Session API** — Control from OS media keys / lock screen
+- **Responsive** — Desktop, tablet, and mobile
+- **Docker + HTTPS** — Production-ready with Nginx reverse proxy
 
-## 📋 Prerequisites
+## Prerequisites
 
-- **Navidrome** server with Jukebox mode enabled
-- **Docker** and **Docker Compose** (for deployment)
-- **Node.js** 18+ (for development)
-- **MPV** player installed on the server (for audio playback)
-- **ALSA** audio system configured
-- **Let's Encrypt** SSL certificates (optional, for HTTPS)
+- [Navidrome](https://www.navidrome.org/) server with Jukebox mode enabled
+- [Docker](https://www.docker.com/) and Docker Compose
+- [Node.js](https://nodejs.org/) 18+ (for development)
+- [MPV](https://mpv.io/) player and ALSA audio on the server
+- SSL certificates (optional, for HTTPS)
 
-## 🚀 Quick Start
-
-### 1. Clone the Repository
+## Quick Start
 
 ```bash
 git clone https://github.com/bgpntx/kneep.git
 cd kneep
+cp .env.example .env    # Edit with your Last.fm keys
 ```
 
-### 2. Configure Your Environment
+### Configure
 
-#### Update Docker Compose Volumes
+1. Edit `docker-compose.yml` — update volume paths for your music library and data directory
+2. Edit `navidrome.toml` — set audio device, jukebox settings, scanner schedule
+3. Edit `nginx.default.conf` — update `server_name` and SSL certificate paths
 
-Edit `docker-compose.yml` to match your setup:
-
-```yaml
-volumes:
-  - /big/Muz:/music:ro              # Your music library (read-only)
-  - /nvme1/navidrome:/data          # Navidrome data directory
-  - ./navidrome.toml:/data/navidrome.toml:ro
-```
-
-#### Configure SSL Certificates (if using HTTPS)
-
-Update paths in `docker-compose.yml`:
-
-```yaml
-volumes:
-  - /etc/letsencrypt/archive/nest.vps.pw/fullchain3.pem:/etc/nginx/ssl/fullchain.pem:ro
-  - /etc/letsencrypt/archive/nest.vps.pw/privkey3.pem:/etc/nginx/ssl/privkey.pem:ro
-```
-
-#### Update Audio Device
-
-Verify your audio device name:
+### Build & Deploy
 
 ```bash
-aplay -L
-```
-
-Update `docker-compose.yml` if needed:
-
-```yaml
-environment:
-  ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' ${INPUT}"
-```
-
-And in `navidrome.toml`:
-
-```toml
-Jukebox.Devices = [
-  ["U24XL", "alsa/sysdefault:CARD=U24XL"]
-]
-Jukebox.Default = "U24XL"
-```
-
-### 3. Configure Navidrome
-
-Review and adjust `navidrome.toml` settings:
-
-```toml
-# Base Configuration
-MusicFolder = "/music"
-DataFolder = "/data"
-LogLevel = "DEBUG"
-SessionTimeout = "48h"
-
-# Jukebox Configuration
-Jukebox.Enabled = true
-Jukebox.AdminOnly = false
-Jukebox.Devices = [
-  ["U24XL", "alsa/sysdefault:CARD=U24XL"]
-]
-Jukebox.Default = "U24XL"
-
-# MPV Configuration
-MPVPath = "/usr/bin/mpv"
-MPVCmdTemplate = "mpv --no-video --audio-device=%d --input-ipc-server=%s %f"
-
-# Library Scanner
-Scanner.Schedule = "@every 24h"
-
-# Cache Settings
-ImageCacheSize = "100MiB"
-TranscodingCacheSize = "100MiB"
-
-# Last.fm Integration (optional)
-[LastFM]
-Enabled = true
-ApiKey = "your-api-key"
-Secret = "your-secret"
-Language = "en"
-```
-
-### 4. Build and Deploy
-
-```bash
-# Build the frontend
-npm install
+npm ci
 npm run build
-
-# Start services
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f
+docker compose up -d
 ```
 
-### 5. Access the Web Player
-
-The application is accessible on multiple ports:
-
-- **HTTP**: `http://your-server:8080`
-- **HTTPS**: `https://your-server:8443`
-- **Navidrome HTTPS**: `https://your-server:4533`
-
-For this setup with domain `nest.vps.pw`:
-- `https://nest.vps.pw:8443` - Web interface
-- `https://nest.vps.pw:4533` - Navidrome API
-
-## ⚙️ Configuration
-
-### System Requirements
-
-- **User/Group**: Container runs as UID 1000, GID 1000
-- **Audio Group**: GID 29 for ALSA device access
-- **Timezone**: Europe/Kyiv (configurable in docker-compose.yml)
-- **Device Access**: `/dev/snd` must be accessible
-
-### First-Time Setup
-
-1. Open the web player at `http://your-server:8080`
-2. Scroll to the configuration section at the bottom
-3. Enter your credentials:
-   - **Server URL**: `http://your-server:4533` (or `https://nest.vps.pw:4533`)
-   - **Username**: Your Navidrome username
-   - **Token** & **Salt**: Get these from Navidrome's web interface
-4. Click **Save & Connect**
-
-### Getting Token and Salt
-
-1. Log into Navidrome's web interface
-2. Open browser DevTools (F12) → Network tab
-3. Play any song or make any API request
-4. Look at the request URL and copy the `t=` and `s=` values
-5. Paste these into the Token and Salt fields
-
-**Note**: Token/salt credentials are valid for 48 hours (configurable via `SessionTimeout`).
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│   Docker Compose Stack                              │
-│                                                     │
-│  ┌─────────────────────────────────────────────────┤
-│  │  Nginx Web Server                               │
-│  │  - Port 8080 (HTTP)                            │
-│  │  - Port 8443 (HTTPS)                           │
-│  │  - Port 4533 (Navidrome HTTPS Proxy)          │
-│  │  - Serves React Frontend from ./dist           │
-│  │  - SSL: Let's Encrypt (nest.vps.pw)           │
-│  └──────────────┬──────────────────────────────────┤
-│                 │                                    │
-│  ┌──────────────▼──────────────────────────────────┤
-│  │  Navidrome Service                              │
-│  │  - Container: navidrome                         │
-│  │  - Image: navidrome-mpv (custom build)        │
-│  │  - User: 1000:1000                             │
-│  │  - Audio Group: 29                             │
-│  │  - Internal Port: 4533                         │
-│  │  - Jukebox API Enabled                         │
-│  │  - Music: /big/Muz (read-only)                │
-│  │  - Data: /nvme1/navidrome                      │
-│  └──────────────┬──────────────────────────────────┤
-│                 │                                    │
-│  ┌──────────────▼──────────────────────────────────┤
-│  │  MPV Player                                     │
-│  │  - Audio Output: ALSA                          │
-│  │  - Device: U24XL                               │
-│  │  - Hardware: /dev/snd                          │
-│  │  - No Video Output                             │
-│  └─────────────────────────────────────────────────┤
-└─────────────────────────────────────────────────────┘
-```
-
-## 🐳 Docker Configuration Details
-
-### Navidrome Service
-
-```yaml
-services:
-  navidrome:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: navidrome-mpv
-    container_name: navidrome
-    user: "1000:1000"
-    environment:
-      TZ: Europe/Kyiv
-      ND_MUSICFOLDER: /music
-      ND_DATAFOLDER: /data
-      ND_LOGLEVEL: debug
-      ND_JUKEBOX_ENABLED: "true"
-      ND_JUKEBOX_ADMINONLY: "false"
-      ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' ${INPUT}"
-    expose:
-      - "4533"
-    volumes:
-      - /big/Muz:/music:ro
-      - /nvme1/navidrome:/data
-      - ./navidrome.toml:/data/navidrome.toml:ro
-    devices:
-      - /dev/snd:/dev/snd
-    group_add:
-      - "29"  # Audio group
-    restart: unless-stopped
-```
-
-### Web/Nginx Service
-
-```yaml
-  web:
-    image: nginx:alpine
-    container_name: jukebox-web
-    depends_on:
-      - navidrome
-    ports:
-      - "8080:80"      # HTTP
-      - "8443:8443"    # HTTPS
-      - "4533:4533"    # Navidrome HTTPS proxy
-    volumes:
-      - ./dist:/usr/share/nginx/html:ro
-      - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt/archive/nest.vps.pw/fullchain3.pem:/etc/nginx/ssl/fullchain.pem:ro
-      - /etc/letsencrypt/archive/nest.vps.pw/privkey3.pem:/etc/nginx/ssl/privkey.pem:ro
-    restart: unless-stopped
-```
-
-## 🛠️ Development
-
-### Local Development
+Or use the rebuild script for a full clean deploy:
 
 ```bash
-# Install dependencies
+bash rebuild.sh
+```
+
+### Access
+
+| Port | Protocol | Description |
+|------|----------|-------------|
+| 8080 | HTTP | Web interface (redirects to HTTPS) |
+| 8443 | HTTPS | Web interface |
+| 4533 | HTTPS | Navidrome API proxy |
+
+## Development
+
+```bash
 npm install
-
-# Start dev server
-npm run dev
-
-# Access at http://localhost:5173
+npm run dev       # http://localhost:5173
 ```
 
-### Building
+The dev server proxies `/rest/*` API calls to `localhost:4533` (configurable in `vite.config.js`).
 
-```bash
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-### Project Structure
+## Project Structure
 
 ```
 kneep/
-├── public/                  # Static assets (images, icons)
-│   ├── play.png
-│   └── winamp.jpg
+├── public/                    # Static assets
 ├── src/
 │   ├── api/
-│   │   └── subsonic.js      # Navidrome/Subsonic API client
+│   │   └── subsonic.js        # Subsonic API client (auth, jukebox, scrobble)
 │   ├── components/
-│   │   └── QueueItem.jsx    # Sortable queue item component
+│   │   └── QueueItem.jsx      # Drag & drop queue item
 │   ├── utils/
-│   │   ├── helpers.js       # Time formatting utilities
-│   │   ├── md5.js           # MD5 hash for Subsonic auth
+│   │   ├── helpers.js         # Time formatting
+│   │   ├── md5.js             # MD5 hash (Subsonic auth requirement)
 │   │   └── playbackManager.js # Playback state persistence
-│   ├── App.jsx              # Main application component
-│   ├── App.css              # Styles
-│   └── main.jsx             # Entry point
-├── docker-compose.yml       # Docker services configuration
-├── Dockerfile               # Custom Navidrome image with MPV
-├── Jenkinsfile              # CI/CD pipeline
-├── nginx.default.conf       # Nginx proxy configuration
-├── navidrome.toml           # Navidrome server configuration
-├── rebuild.sh               # Production rebuild script
-├── vite.config.js           # Vite build configuration
-└── package.json             # Dependencies and scripts
+│   ├── App.jsx                # Main application component
+│   ├── App.css                # Styles
+│   └── main.jsx               # Entry point
+├── docker-compose.yml         # Docker services
+├── Dockerfile                 # Navidrome + MPV image
+├── Jenkinsfile                # CI/CD pipeline
+├── nginx.default.conf         # Nginx proxy config
+├── navidrome.toml             # Navidrome config
+├── rebuild.sh                 # Production rebuild script
+└── vite.config.js             # Vite config
 ```
 
-## 🔧 Troubleshooting
+## Architecture
 
-### "Wrong username or password" Error
+```
+┌──────────────────────────────────────────────┐
+│  Docker Compose                              │
+│                                              │
+│  ┌────────────────────────────────────────┐  │
+│  │  Nginx (nginx:alpine)                  │  │
+│  │  :8080 HTTP → HTTPS redirect           │  │
+│  │  :8443 HTTPS → serves React SPA        │  │
+│  │  :4533 HTTPS → proxy to Navidrome      │  │
+│  └──────────────┬─────────────────────────┘  │
+│                 │                             │
+│  ┌──────────────▼─────────────────────────┐  │
+│  │  Navidrome (navidrome-mpv)             │  │
+│  │  :4533 internal                        │  │
+│  │  Jukebox API → MPV → ALSA → /dev/snd  │  │
+│  └────────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
+```
 
-- Verify your token and salt are correct
-- Check if the token has expired (regenerate from Navidrome)
-- Ensure the server URL is correct and accessible
-- Verify SessionTimeout in navidrome.toml (default: 48h)
+## Configuration
 
-### No Audio Playing
-
-1. **Check MPV installation**:
-   ```bash
-   docker exec navidrome which mpv
-   ```
-
-2. **Verify audio device**:
-   ```bash
-   docker exec navidrome aplay -L
-   ```
-
-3. **Check audio group permissions**:
-   ```bash
-   ls -l /dev/snd/
-   getent group 29  # Should show audio group
-   ```
-
-4. **View Navidrome logs**:
-   ```bash
-   docker-compose logs -f navidrome
-   ```
-
-5. **Test MPV directly**:
-   ```bash
-   docker exec navidrome mpv --audio-device=alsa/sysdefault:CARD=U24XL /music/test.mp3
-   ```
-
-### Docker Container Issues
+### Environment Variables (`.env`)
 
 ```bash
-# Check container status
-docker-compose ps
-
-# Restart services
-docker-compose restart
-
-# Rebuild with no cache
-docker-compose build --no-cache
-docker-compose up -d
-
-# View all logs
-docker-compose logs
+LASTFM_API_KEY=your_key    # Last.fm API key (optional)
+LASTFM_SECRET=your_secret  # Last.fm secret (optional)
 ```
 
-### HTTPS/SSL Issues
+### Navidrome (`navidrome.toml`)
 
-- Verify certificate paths exist:
-  ```bash
-  ls -l /etc/letsencrypt/archive/nest.vps.pw/
-  ```
-- Check Nginx configuration:
-  ```bash
-  docker exec jukebox-web nginx -t
-  ```
-- Review Nginx logs:
-  ```bash
-  docker-compose logs web
-  ```
+Key settings:
 
-### Firefox HTTPS-Only Mode
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `Jukebox.Enabled` | `true` | Enable server-side playback |
+| `Jukebox.Devices` | `U24XL` | ALSA audio device name |
+| `SessionTimeout` | `24h` | Authentication session lifetime |
+| `Scanner.Schedule` | `@every 24h` | Library scan interval |
 
-If using Firefox with local HTTP:
-1. Click the 🔒 lock icon in the address bar
-2. Select "Turn off HTTPS-Only Mode"
-3. Reload the page
+### First-Time Login
 
-### Permission Denied on /dev/snd
+1. Open the web player
+2. Enter your Navidrome **username** and **password** at the bottom
+3. Leave **Server URL** empty if using the Nginx proxy
+
+## Troubleshooting
+
+### No Audio
 
 ```bash
-# Add user to audio group on host
-sudo usermod -aG audio $(whoami)
-
-# Or adjust group_add in docker-compose.yml to match your system
-getent group audio  # Check audio GID
+docker exec navidrome which mpv          # Check MPV installed
+docker exec navidrome aplay -L           # List audio devices
+ls -l /dev/snd/                          # Check device permissions
+docker compose logs -f navidrome         # Check logs
 ```
 
-### Music Library Not Scanning
+### Authentication Issues
 
-1. Check volume mount permissions:
-   ```bash
-   docker exec navidrome ls -la /music
-   ```
+- Check that Navidrome is reachable at the configured URL
+- Clear browser localStorage and re-login
+- Check `SessionTimeout` in `navidrome.toml`
 
-2. Trigger manual scan:
-   - Log into Navidrome web UI
-   - Go to Settings → Library
-   - Click "Full Rescan"
-
-3. Check scanner schedule in navidrome.toml:
-   ```toml
-   Scanner.Schedule = "@every 24h"
-   ```
-
-## 🎨 Features in Detail
-
-### Queue Management
-- Click track number to jump to that song
-- Remove individual tracks with ✕ button
-- Clear entire queue with Clear button
-- View current playing track highlighted
-- Shuffle queue order
-
-### Search
-- Real-time search as you type
-- Search across title, artist, and album
-- Click any result to add to queue
-- Automatically starts playback if queue is empty
-
-### Playback Controls
-- **Play/Pause**: Toggle playback
-- **Previous**: Go to previous track (or restart if >3s into song)
-- **Next**: Skip to next track
-- **Shuffle**: Randomize queue order
-- **Repeat**: Off → All → One
-- **Stop**: Stop playback and reset
-- **Clear**: Remove all tracks from queue
-- **Random**: Add a random song from your library
-
-### Volume Control
-- Smooth volume slider (0-100%)
-- Real-time volume adjustment
-- Persists between sessions via localStorage
-
-## 🔐 Security Notes
-
-- Credentials stored in browser's `localStorage`
-- Token/salt authentication follows Subsonic API standard
-- No password storage - only pre-generated tokens
-- HTTPS supported via Let's Encrypt certificates
-- Nginx reverse proxy for secure API access
-- Read-only music volume mount
-
-## 📝 Environment Variables
-
-Configure via Docker Compose:
-
-```yaml
-environment:
-  TZ: Europe/Kyiv                    # Timezone
-  ND_MUSICFOLDER: /music             # Music library path
-  ND_DATAFOLDER: /data               # Data directory
-  ND_LOGLEVEL: debug                 # Log level (info, debug, trace)
-  ND_JUKEBOX_ENABLED: "true"         # Enable jukebox mode
-  ND_JUKEBOX_ADMINONLY: "false"      # Allow non-admin jukebox access
-  ND_MPV_CMD_TEMPLATE: "..."         # MPV command template
-```
-
-## 📊 Monitoring & Logs
+### Docker Issues
 
 ```bash
-# Follow all logs
-docker-compose logs -f
-
-# Navidrome only
-docker-compose logs -f navidrome
-
-# Nginx only
-docker-compose logs -f web
-
-# Last 100 lines
-docker-compose logs --tail=100
-
-# Check resource usage
-docker stats navidrome jukebox-web
+docker compose ps                        # Container status
+docker compose logs -f                   # All logs
+docker compose build --no-cache && docker compose up -d  # Full rebuild
 ```
 
-## 🔄 Updates & Maintenance
-
-### Update Navidrome
+### Permission Denied on `/dev/snd`
 
 ```bash
-docker-compose pull
-docker-compose up -d
+sudo usermod -aG audio $(whoami)         # Add user to audio group
+getent group audio                       # Verify audio GID matches docker-compose.yml
 ```
 
-### Update Frontend
+## Security
 
-```bash
-npm install
-npm run build
-docker-compose restart web
-```
+- Token/salt auth follows [Subsonic API](http://www.subsonic.org/pages/api.jsp) standard
+- Credentials stored in browser `localStorage` (no server-side session)
+- HTTPS via Let's Encrypt
+- Music library mounted read-only
+- CORS restricted to configured origin
 
-### Backup Configuration
+## License
 
-```bash
-# Backup data directory
-tar -czf navidrome-backup-$(date +%Y%m%d).tar.gz /nvme1/navidrome
+[MIT](LICENSE)
 
-# Backup configuration
-cp navidrome.toml navidrome.toml.backup
-cp docker-compose.yml docker-compose.yml.backup
-```
+## Acknowledgments
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🙏 Acknowledgments
-
-- [Navidrome](https://www.navidrome.org/) - The excellent music server
-- [React](https://react.dev/) - UI framework
-- [Vite](https://vitejs.dev/) - Build tool
-- [MPV](https://mpv.io/) - Media player
-- [Nginx](https://nginx.org/) - Web server and reverse proxy
-
-## 📧 Support
-
-For issues and questions:
-- Check the [Troubleshooting](#-troubleshooting) section
-- Review [Navidrome documentation](https://www.navidrome.org/docs/)
-- Check [MPV documentation](https://mpv.io/manual/stable/)
-- Open an issue on GitHub
-
-## 🌟 Related Projects
-
-- [Navidrome](https://github.com/navidrome/navidrome) - Music Server and Streamer
-- [Subsonic](http://www.subsonic.org/) - Original protocol specification
-
----
-
-**Made with ❤️ for music lovers who want a better jukebox experience**
-
-*Configured for nest.vps.pw with U24XL audio device*
+- [Navidrome](https://www.navidrome.org/) — Music server
+- [React](https://react.dev/) — UI framework
+- [Vite](https://vitejs.dev/) — Build tool
+- [MPV](https://mpv.io/) — Media player
+- [@dnd-kit](https://dndkit.com/) — Drag and drop
