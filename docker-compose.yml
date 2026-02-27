@@ -1,5 +1,6 @@
 services:
   navidrome:
+    env_file: .env
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,7 +14,12 @@ services:
       ND_LOGLEVEL: debug
       ND_JUKEBOX_ENABLED: "true"
       ND_JUKEBOX_ADMINONLY: "false"
-      ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' ${INPUT}"
+      ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' --input-ipc-server=%s %f"
+      # Last.fm integration - reads from .env file
+      ND_LASTFM_APIKEY: ${LASTFM_API_KEY}
+      ND_LASTFM_SECRET: ${LASTFM_SECRET}
+      ND_LASTFM_ENABLED: "true"
+      ND_LASTFM_LANGUAGE: "en"
     # Only expose internally to docker network, not to host
     expose:
       - "4533"
@@ -21,6 +27,8 @@ services:
       - /big/Muz:/music:ro
       - /nvme1/navidrome:/data
       - ./navidrome.toml:/data/navidrome.toml:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     devices:
       - /dev/snd:/dev/snd
     group_add:
@@ -39,8 +47,8 @@ services:
     volumes:
       - ./dist:/usr/share/nginx/html:ro
       - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt/archive/nest.vps.pw/fullchain3.pem:/etc/nginx/ssl/fullchain.pem:ro
-      - /etc/letsencrypt/archive/nest.vps.pw/privkey3.pem:/etc/nginx/ssl/privkey.pem:ro
+      - /etc/letsencrypt/live/nest.vps.pw/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/live/nest.vps.pw/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
     environment:
       SSL_CERTIFICATE: /etc/nginx/ssl/fullchain.pem
       SSL_CERTIFICATE_KEY: /etc/nginx/ssl/privkey.pem

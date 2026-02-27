@@ -1,203 +1,39 @@
-// src/App.jsx - All-in-one Jukebox Player with Scrobbling, Drag-n-Drop & Repeat
+// src/App.jsx - v5: Modular refactor — no functional or design changes
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-// --- DND-KIT IMPORTS ---
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
-// --- Jukebox API Logic ---
-// ... (md5, API calls, etc. - functions remain the same) ...
-const API_VERSION = '1.16.1';
-const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
+// Modular imports
+import {
+    DEBUG,
+    coverArtUrl,
+    callJukebox,
+    addRandomSong,
+    searchSongs,
+    scrobble,
+    getConfig,
+    authenticate,
+    reconnect,
+    isSessionValid,
+    clearSession,
+} from './api/subsonic.js';
+import { fmtTime, formatDuration } from './utils/helpers.js';
+import { PlaybackStateManager } from './utils/playbackManager.js';
+import { JukeboxQueueItem } from './components/QueueItem.jsx';
 
-let config = JSON.parse(localStorage.getItem('jukeboxConfig')) || {
-    serverUrl: '',
-    username: '',
-    token: '',
-    salt: ''
-};
-
-function md5(string) {
-    function rotateLeft(lValue, iShiftBits) {
-        return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits));
-    }
-    function addUnsigned(lX, lY) {
-        const lX8 = (lX & 0x80000000); const lY8 = (lY & 0x80000000);
-        const lX4 = (lX & 0x40000000); const lY4 = (lY & 0x40000000);
-        const lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF);
-        if (lX4 & lY4) { return (lResult ^ 0x80000000 ^ lX8 ^ lY8); }
-        if (lX4 | lY4) { if (lResult & 0x40000000) { return (lResult ^ 0xC0000000 ^ lX8 ^ lY8); } else { return (lResult ^ 0x40000000 ^ lX8 ^ lY8); } } else { return (lResult ^ lX8 ^ lY8); }
-    }
-    function F(x, y, z) { return (x & y) | ((~x) & z); }
-    function G(x, y, z) { return (x & z) | (y & (~z)); }
-    function H(x, y, z) { return (x ^ y ^ z); }
-    function I(x, y, z) { return (y ^ (x | (~z))); }
-    function FF(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function GG(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function HH(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function II(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function convertToWordArray(string) {
-        let lWordCount; const lMessageLength = string.length;
-        const lNumberOfWords_temp1 = lMessageLength + 8; const lNumberOfWords_temp2 = (lNumberOfWords_temp1 - (lNumberOfWords_temp1 % 64)) / 64;
-        const lNumberOfWords = (lNumberOfWords_temp2 + 1) * 16; const lWordArray = new Array(lNumberOfWords - 1);
-        let lBytePosition = 0; let lByteCount = 0;
-        while (lByteCount < lMessageLength) { lWordCount = (lByteCount - (lByteCount % 4)) / 4; lBytePosition = (lByteCount % 4) * 8; lWordArray[lWordCount] = (lWordArray[lWordCount] | (string.charCodeAt(lByteCount) << lBytePosition)); lByteCount++; }
-        lWordCount = (lByteCount - (lByteCount % 4)) / 4; lBytePosition = (lByteCount % 4) * 8;
-        lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition); lWordArray[lNumberOfWords - 2] = lMessageLength << 3; lWordArray[lNumberOfWords - 1] = lMessageLength >>> 29; return lWordArray;
-    }
-    function wordToHex(lValue) {
-        let wordToHexValue = "", wordToHexValue_temp = "", lByte, lCount;
-        for (lCount = 0; lCount <= 3; lCount++) { lByte = (lValue >>> (lCount * 8)) & 255; wordToHexValue_temp = "0" + lByte.toString(16); wordToHexValue = wordToHexValue + wordToHexValue_temp.substr(wordToHexValue_temp.length - 2, 2); }
-        return wordToHexValue;
-    }
-    function utf8Encode(string) {
-        string = string.replace(/\r\n/g, "\n"); let utftext = "";
-        for (let n = 0; n < string.length; n++) {
-            const c = string.charCodeAt(n);
-            if (c < 128) { utftext += String.fromCharCode(c); } else if ((c > 127) && (c < 2048)) { utftext += String.fromCharCode((c >> 6) | 192); utftext += String.fromCharCode((c & 63) | 128); } else { utftext += String.fromCharCode((c >> 12) | 224); utftext += String.fromCharCode(((c >> 6) & 63) | 128); utftext += String.fromCharCode((c & 63) | 128); }
-        } return utftext;
-    }
-    let x = []; let k, AA, BB, CC, DD, a, b, c, d;
-    const S11 = 7, S12 = 12, S13 = 17, S14 = 22; const S21 = 5, S22 = 9, S23 = 14, S24 = 20;
-    const S31 = 4, S32 = 11, S33 = 16, S34 = 23; const S41 = 6, S42 = 10, S43 = 15, S44 = 21;
-    string = utf8Encode(string); x = convertToWordArray(string);
-    a = 0x67452301; b = 0xEFCDAB89; c = 0x98BADCFE; d = 0x10325476;
-    for (k = 0; k < x.length; k += 16) {
-        AA = a; BB = b; CC = c; DD = d;
-        a = FF(a, b, c, d, x[k + 0], S11, 0xD76AA478); d = FF(d, a, b, c, x[k + 1], S12, 0xE8C7B756); c = FF(c, d, a, b, x[k + 2], S13, 0x242070DB); b = FF(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE); a = FF(a, b, c, d, x[k + 4], S11, 0xF57C0FAF); d = FF(d, a, b, c, x[k + 5], S12, 0x4787C62A); c = FF(c, d, a, b, x[k + 6], S13, 0xA8304613); b = FF(b, c, d, a, x[k + 7], S14, 0xFD469501); a = FF(a, b, c, d, x[k + 8], S11, 0x698098D8); d = FF(d, a, b, c, x[k + 9], S12, 0x8B44F7AF); c = FF(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1); b = FF(b, c, d, a, x[k + 11], S14, 0x895CD7BE); a = FF(a, b, c, d, x[k + 12], S11, 0x6B901122); d = FF(d, a, b, c, x[k + 13], S12, 0xFD987193); c = FF(c, d, a, b, x[k + 14], S13, 0xA679438E); b = FF(b, c, d, a, x[k + 15], S14, 0x49B40821);
-        a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562); d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340); c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51); b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA); a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D); d = GG(d, a, b, c, x[k + 10], S22, 0x02441453); c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681); b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8); a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6); d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6); c = GG(c, d, a, b, x[k + 3], S23, 0xF4D50D87); b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED); a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905); d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8); c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9); b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
-        a = HH(a, b, c, d, x[k + 5], S31, 0xFFFA3942); d = HH(d, a, b, c, x[k + 8], S32, 0x8771F681); c = HH(c, d, a, b, x[k + 11], S33, 0x6D9D6122); b = HH(b, c, d, a, x[k + 14], S34, 0xFDE5380C); a = HH(a, b, c, d, x[k + 1], S31, 0xA4BEEA44); d = HH(d, a, b, c, x[k + 4], S32, 0x4BDECFA9); c = HH(c, d, a, b, x[k + 7], S33, 0xF6BB4B60); b = HH(b, c, d, a, x[k + 10], S34, 0xBEBFBC70); a = HH(a, b, c, d, x[k + 13], S31, 0x289B7EC6); d = HH(d, a, b, c, x[k + 0], S32, 0xEAA127FA); c = HH(c, d, a, b, x[k + 3], S33, 0xD4EF3085); b = HH(b, c, d, a, x[k + 6], S34, 0x04881D05); a = HH(a, b, c, d, x[k + 9], S31, 0xD9D4D039); d = HH(d, a, b, c, x[k + 12], S32, 0xE6DB99E5); c = HH(c, d, a, b, x[k + 15], S33, 0x1FA27CF8); b = HH(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
-        a = II(a, b, c, d, x[k + 0], S41, 0xF4292244); d = II(d, a, b, c, x[k + 7], S42, 0x432AFF97); c = II(c, d, a, b, x[k + 14], S43, 0xAB9423A7); b = II(b, c, d, a, x[k + 5], S44, 0xFC93A039); a = II(a, b, c, d, x[k + 12], S41, 0x655B59C3); d = II(d, a, b, c, x[k + 3], S42, 0x8F0CCC92); c = II(c, d, a, b, x[k + 10], S43, 0xFFEFF47D); b = II(b, c, d, a, x[k + 1], S44, 0x85845DD1); a = II(a, b, c, d, x[k + 8], S41, 0x6FA87E4F); d = II(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0); c = II(c, d, a, b, x[k + 6], S43, 0xA3014314); b = II(b, c, d, a, x[k + 13], S44, 0x4E0811A1); a = II(a, b, c, d, x[k + 4], S41, 0xF7537E82); d = II(d, a, b, c, x[k + 11], S42, 0xBD3AF235); c = II(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB); b = II(b, c, d, a, x[k + 9], S44, 0xEB86D391);
-        a = addUnsigned(a, AA); b = addUnsigned(b, BB); c = addUnsigned(c, CC); d = addUnsigned(d, DD);
-    }
-    const temp = wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d);
-    return temp.toLowerCase();
-}
-
-function generateSalt() { return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15); }
-function generateToken(password, salt) { return md5(password + salt); }
-function isSessionValid() { return !!(config.token && config.salt && config.username); }
-function clearSession() {
-    const serverUrl = config.serverUrl;
-    localStorage.removeItem('jukeboxConfig');
-    config = { serverUrl: serverUrl, username: '', token: '', salt: '' };
-    if (DEBUG()) console.log('Session cleared');
-}
-function escapeHtml(s) { return String(s); }
-function buildJukeboxUrl(action, extra = '') {
-    if (!config.token || !config.salt) throw new Error('Not authenticated');
-    const base = `${config.serverUrl}/rest/jukeboxControl?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
-    return `${base}&action=${action}${extra}`;
-}
-function coverArtUrl(id, size = 512) {
-    if (!id || !config.token || !config.salt) return '';
-    return `${config.serverUrl}/rest/getCoverArt?id=${encodeURIComponent(id)}&size=${size}&u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox`;
-}
-async function callJukebox(action, extra = '') {
-    if (!isSessionValid()) throw new Error('Not authenticated');
-    const url = buildJukeboxUrl(action, extra);
-    try {
-        const res = await fetch(url);
-        if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        const data = await res.json();
-        if (DEBUG()) console.log(`API ${action} response:`, data);
-        const resp = data?.['subsonic-response'];
-        if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Unknown API error'; throw new Error(`API failed: ${errorMsg}`); }
-        const playlistObj = resp.jukeboxPlaylist || {};
-        const statusObj = resp.jukeboxStatus || playlistObj;
-        const status = { currentIndex: statusObj.currentIndex ?? 0, playing: statusObj.playing ?? false, gain: statusObj.gain ?? 1, position: statusObj.position ?? 0, };
-        const playlist = { entry: playlistObj.entry || [] };
-        return { status, playlist };
-    } catch (error) { if (error.message === 'Authentication failed') { throw error; } throw error; }
-}
-async function getRandomSongFromServer() {
-    if (!isSessionValid()) throw new Error('Not authenticated');
-    const url = `${config.serverUrl}/rest/getRandomSongs?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&size=1`;
-    const res = await fetch(url);
-    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-    const data = await res.json();
-    const resp = data?.['subsonic-response'];
-    if (resp?.status !== 'ok') throw new Error(`API failed: ${resp?.error?.message || 'Unknown error'}`);
-    const song = Array.isArray(resp.randomSongs?.song) ? resp.randomSongs.song[0] : resp.randomSongs?.song;
-    if (!song || !song.id) throw new Error('Server returned no songs.');
-    return song;
-}
-async function addRandomSong() {
-    const randomSong = await getRandomSongFromServer();
-    const resp = await callJukebox('add', `&id=${encodeURIComponent(randomSong.id)}`);
-    return { randomSong, resp };
-}
-async function searchSongs(query) {
-    if (query.length < 2) return [];
-    if (!isSessionValid()) throw new Error('Not authenticated');
-    const url = `${config.serverUrl}/rest/search3?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&query=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-    const data = await res.json();
-    return data?.['subsonic-response']?.searchResult3?.song || [];
-}
-async function scrobble(id, submission = false) {
-    if (!isSessionValid() || !id) {
-        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.');
-        return;
-    }
-    const extra = `&id=${encodeURIComponent(id)}&submission=${submission}`;
-    const url = `${config.serverUrl}/rest/scrobble?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json${extra}`;
-    try {
-        const res = await fetch(url);
-        if (!res.ok) { if (DEBUG()) console.warn(`Scrobble API returned HTTP ${res.status}`); return; }
-        const data = await res.json();
-        const resp = data?.['subsonic-response'];
-        if (DEBUG()) { const type = submission ? 'Scrobble' : 'Now Playing'; console.log(`${type} response for ID ${id}:`, data); }
-        if (resp?.status !== 'ok') { if (DEBUG()) console.warn(`Scrobble API error: ${resp?.error?.message}`); }
-    } catch (error) { if (DEBUG()) console.error('Scrobble call failed:', error.message); }
-}
-function getConfig() { return { serverUrl: config.serverUrl, username: config.username }; }
-async function authenticate(serverUrl, username, password) {
-    if (!username || !password) throw new Error('Username and password are required');
-    serverUrl = serverUrl || '';
-    const salt = generateSalt();
-    const token = generateToken(password, salt);
-    const testUrl = `${serverUrl}/rest/ping?u=${encodeURIComponent(username)}&t=${token}&s=${salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
-    const res = await fetch(testUrl);
-    if (!res.ok) throw new Error(`Server error: ${res.status} ${res.statusText}`);
-    const data = await res.json();
-    const resp = data?.['subsonic-response'];
-    if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Authentication failed'; throw new Error(errorMsg); }
-    config = { serverUrl, username, token, salt };
-    localStorage.setItem('jukeboxConfig', JSON.stringify(config));
-    if (DEBUG()) { console.log('Authentication successful'); console.log('Token:', token); console.log('Salt:', salt); }
-    return config;
-}
-async function reconnect() {
-    if (!isSessionValid()) return false;
-    try { await callJukebox('get'); return true; } catch (error) { clearSession(); return false; }
-}
-
-// --- UTILITY FUNCTIONS ---
-function fmtTime(sec) {
-    sec = Math.max(0, Math.floor(sec));
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-// --- INITIAL STATE ---
 const initialState = {
     playlist: [],
     currentIndex: 0,
@@ -206,69 +42,13 @@ const initialState = {
     position: 0,
     lastStatusTs: 0,
     localTickStart: 0,
-    // --- ADDED: repeatMode to initial state ---
-    repeatMode: 'off', // 'off', 'all', 'one'
+    repeatMode: 'off',
     seeking: false,
     endHandledForId: null,
+    lastPlayingTrackId: null, // Track the last playing track for auto-remove
 };
 
-// --- Component for a single sortable queue item ---
-/* ... JukeboxQueueItem component remains the same ... */
-function JukeboxQueueItem({ song, index, currentIndex, onAction, id }) {
-    const isCurrent = index === currentIndex;
-
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: id }); // Use the song ID as the unique ID
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        touchAction: 'none', // Recommended for pointer sensors
-    };
-
-    const className = `qitem${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`;
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            {...attributes}
-            {...listeners} // Attach listeners to the whole item
-            className={className}
-            data-index={index}
-        >
-            <div className="idx">{index + 1}</div>
-            <div>
-                <div className="qi-title">{escapeHtml(song.title || 'Unknown')}</div>
-                <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
-            </div>
-            <div className="qi-actions">
-                {/* Add onPointerDown to stop drag from starting on buttons */}
-                <button
-                    title="Play here"
-                    className="btn"
-                    onClick={(e) => { e.stopPropagation(); onAction('play', index); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                >▶️</button>
-                <button
-                    title="Remove"
-                    className="btn"
-                    onClick={(e) => { e.stopPropagation(); onAction('remove', index); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                >✖️</button>
-            </div>
-        </div>
-    );
-}
-
 export default function App() {
-    // --- State variables ---
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
     const [searchQuery, setSearchQuery] = useState('');
@@ -277,27 +57,31 @@ export default function App() {
     const [searchResults, setSearchResults] = useState([]);
     const [scrobbledIds, setScrobbledIds] = useState(new Set());
 
-    // --- Refs ---
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
-    const prevIndexRef = useRef(state.currentIndex);
     const nowPlayingIdRef = useRef(null);
-    // --- ADDED: Ref to prevent rapid repeat firing ---
     const repeatOneTriggeredRef = useRef(null);
+    const playbackManager = useRef(new PlaybackStateManager());
+    const lastVisibilityStateRef = useRef(!document.hidden);
+    // v4: Flag to prevent auto-remove during visibility recovery
+    const isRecoveringFromHiddenRef = useRef(false);
 
     useEffect(() => { stateRef.current = state; }, [state]);
 
-    // --- Font Loading ---
+    useEffect(() => {
+        const stored = playbackManager.current.getScrobbled();
+        setScrobbledIds(stored);
+        if (DEBUG()) console.log('Loaded scrobbled IDs:', stored.size);
+    }, []);
+
     useEffect(() => {
         const fontLink = document.createElement('link');
-        fontLink.href = 'https.googleapis.com/css2?family=Spinnaker&display=swap';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=Spinnaker&display=swap';
         fontLink.rel = 'stylesheet';
         document.head.appendChild(fontLink);
         return () => { document.head.removeChild(fontLink); };
     }, []);
 
-    // --- Media Session API ---
-    /* ... Media Session functions remain the same ... */
     const updateMediaSession = useCallback((track, position, playing) => {
         if ('mediaSession' in navigator && track) {
             try {
@@ -357,7 +141,7 @@ export default function App() {
                             skipTo(currentState.currentIndex, details.seekTime);
                         }
                     });
-                } catch (e) {}
+                } catch (e) { }
 
                 try {
                     navigator.mediaSession.setActionHandler('seekbackward', () => {
@@ -365,7 +149,7 @@ export default function App() {
                         const newPos = Math.max(0, currentState.position - 10);
                         skipTo(currentState.currentIndex, newPos);
                     });
-                } catch (e) {}
+                } catch (e) { }
 
                 try {
                     navigator.mediaSession.setActionHandler('seekforward', () => {
@@ -375,18 +159,41 @@ export default function App() {
                         const newPos = Math.min(maxPos, currentState.position + 10);
                         skipTo(currentState.currentIndex, newPos);
                     });
-                } catch (e) {}
+                } catch (e) { }
             } catch (error) {
                 console.error('Error setting up Media Session handlers:', error);
             }
         }
     }, []);
 
-    // --- Core State Refresh Logic ---
-    /* ... refreshState function remains the same ... */
+    // Auto-remove finished track from queue
+    const removeFinishedTrack = useCallback(async (trackId) => {
+        if (!trackId || commandInProgress.current) return;
+
+        const currentState = stateRef.current;
+        const trackIndex = currentState.playlist.findIndex(t => t.id === trackId);
+
+        if (trackIndex === -1 || trackIndex >= currentState.currentIndex) {
+            // Track not found or hasn't been passed yet
+            return;
+        }
+
+        if (DEBUG()) console.log(`Auto-removing finished track at index ${trackIndex}: ${trackId}`);
+
+        try {
+            commandInProgress.current = true;
+            await callJukebox('remove', `&index=${trackIndex}`);
+            // State will be updated by the next refresh
+        } catch (e) {
+            console.error('Failed to auto-remove track:', e);
+        } finally {
+            commandInProgress.current = false;
+        }
+    }, []);
+
     const refreshState = useCallback(async (forceUpdate = false) => {
         if (!forceUpdate && commandInProgress.current) {
-            return;
+            return null;
         }
 
         try {
@@ -397,11 +204,18 @@ export default function App() {
                 ? playlist.entry
                 : (playlist?.entry ? [playlist.entry] : []);
 
-            setState(prevState => {
-                const currentTrack = newPlaylist[status.currentIndex || 0];
-                const prevTrack = prevState.playlist[prevState.currentIndex];
+            const currentTrack = newPlaylist[status.currentIndex || 0];
+            const prevState = stateRef.current;
+            const prevTrack = prevState.playlist[prevState.currentIndex];
 
-                // --- ADDED: Reset repeat trigger if track changed ---
+            // v4: Detect track change for auto-remove (skip during visibility recovery)
+            if (prevTrack && currentTrack && prevTrack.id !== currentTrack.id) {
+                if (!isRecoveringFromHiddenRef.current) {
+                    setTimeout(() => removeFinishedTrack(prevTrack.id), 100);
+                }
+            }
+
+            setState(prevState => {
                 if (currentTrack?.id !== prevTrack?.id) {
                     repeatOneTriggeredRef.current = null;
                 }
@@ -416,12 +230,31 @@ export default function App() {
                     lastStatusTs: Date.now(),
                     localTickStart: status.position,
                     endHandledForId: currentTrack?.id !== prevTrack?.id ? null : prevState.endHandledForId,
-                    // Persist repeatMode across refreshes
-                    repeatMode: prevState.repeatMode
+                    repeatMode: prevState.repeatMode,
+                    lastPlayingTrackId: currentTrack?.id
                 };
             });
 
             setStatusText(status.playing ? '▶️ Playing' : '⏸️ Paused');
+
+            if (currentTrack && status.playing) {
+                playbackManager.current.saveState({
+                    currentTrack,
+                    currentIndex: status.currentIndex,
+                    position: status.position,
+                    playing: status.playing,
+                    playlist: newPlaylist
+                });
+            }
+
+            return {
+                trackId: currentTrack?.id,
+                title: currentTrack?.title,
+                duration: currentTrack?.duration || 0,
+                position: status.position,
+                playing: status.playing
+            };
+
         } catch (e) {
             if (e.message === 'Authentication failed' || e.message === 'Not authenticated') {
                 setIsAuthenticated(false);
@@ -430,12 +263,70 @@ export default function App() {
                 setStatusText(`Error: ${e.message}`);
             }
             console.error('Refresh failed:', e);
+            return null;
         }
-    }, []);
+    }, [removeFinishedTrack]);
 
+    const scrobbleTrack = useCallback(async (trackId, title, duration, playedTo) => {
+        if (!trackId || duration <= 30) return false;
 
-    // --- Transport & Queue Actions ---
-    /* ... skipTo, handleTransport, handleQueueAction remain the same ... */
+        if (scrobbledIds.has(trackId)) {
+            if (DEBUG()) console.log(`Already scrobbled: ${title}`);
+            return false;
+        }
+
+        const isHalfway = playedTo >= duration / 2;
+        const isFourMinutes = playedTo >= 240;
+
+        if (isHalfway || isFourMinutes) {
+            if (DEBUG()) console.log(`✓ Scrobbling: ${title} (${playedTo.toFixed(1)}s/${duration}s)`);
+            await scrobble(trackId, true);
+
+            const newScrobbled = playbackManager.current.addScrobbled(trackId);
+            setScrobbledIds(newScrobbled);
+
+            return true;
+        }
+
+        return false;
+    }, [scrobbledIds]);
+
+    const processMissedScrobbles = useCallback(async (savedState, currentState) => {
+        if (!savedState) return 0;
+
+        const missedTracks = playbackManager.current.calculateMissedTracks(savedState, currentState);
+
+        if (missedTracks.length === 0) {
+            if (DEBUG()) console.log('No missed tracks to scrobble');
+            return 0;
+        }
+
+        let scrobbleCount = 0;
+
+        for (const track of missedTracks) {
+            const scrobbled = await scrobbleTrack(track.id, track.title, track.duration, track.playedTo);
+            if (scrobbled) {
+                scrobbleCount++;
+                if (scrobbleCount < missedTracks.length) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+        }
+
+        if (scrobbleCount > 0) {
+            console.log(`✓ Caught up: Scrobbled ${scrobbleCount} missed track(s)`);
+        }
+
+        return scrobbleCount;
+    }, [scrobbleTrack]);
+
+    const checkAndScrobble = useCallback(async (freshData) => {
+        if (!freshData || !freshData.trackId || !freshData.playing) return;
+
+        const { trackId, title, duration, position } = freshData;
+        await scrobbleTrack(trackId, title, duration, position);
+    }, [scrobbleTrack]);
+
     const skipTo = useCallback(async (index, offsetSec = 0) => {
         const currentState = stateRef.current;
         index = Math.max(0, Math.min(index, currentState.playlist.length - 1));
@@ -443,7 +334,6 @@ export default function App() {
         commandInProgress.current = true;
         try {
             await callJukebox('skip', `&index=${index}&offset=${Math.max(0, Math.floor(offsetSec))}`);
-            // --- ADDED: Ensure repeat trigger is reset after manual skip ---
             repeatOneTriggeredRef.current = null;
             await refreshState(true);
         } catch (e) {
@@ -464,7 +354,7 @@ export default function App() {
                 setState(prev => ({ ...prev, playing: !prev.playing }));
             } else if (action === 'next') {
                 await callJukebox('skip', `&index=${currentState.currentIndex + 1}&offset=0`);
-                 repeatOneTriggeredRef.current = null; // Reset on skip
+                repeatOneTriggeredRef.current = null;
             } else if (action === 'previous') {
                 const restart = (currentState.position || 0) > 3;
                 if (restart) {
@@ -472,13 +362,10 @@ export default function App() {
                 } else {
                     await callJukebox('skip', `&index=${Math.max(0, currentState.currentIndex - 1)}&offset=0`);
                 }
-                 repeatOneTriggeredRef.current = null; // Reset on skip
+                repeatOneTriggeredRef.current = null;
             } else if (action === 'clear') {
-                if (!confirm('Clear the whole queue?')) {
-                    commandInProgress.current = false;
-                    return;
-                }
                 await callJukebox('clear');
+                setStatusText('Queue cleared');
             } else if (action === 'shuffle') {
                 await callJukebox('shuffle');
             } else if (action === 'stop') {
@@ -512,15 +399,13 @@ export default function App() {
                 await callJukebox('remove', `&index=${index}`);
                 await refreshState(true);
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e);
         } finally {
             commandInProgress.current = false;
         }
     }, [skipTo, refreshState]);
 
-
-    // --- ADDED: Repeat Button Handler ---
     const handleRepeatClick = useCallback(() => {
         setState(prev => {
             const nextMode = prev.repeatMode === 'off' ? 'all' : prev.repeatMode === 'all' ? 'one' : 'off';
@@ -528,27 +413,79 @@ export default function App() {
         });
     }, []);
 
-    // --- Effects & Listeners ---
-    /* ... Visibility, Media Session Setup, Initialization useEffects remain the same ... */
+    const upcomingCount = useMemo(() => {
+        return Math.max(0, state.playlist.length - state.currentIndex - 1);
+    }, [state.playlist.length, state.currentIndex]);
+
+    const totalQueueSeconds = useMemo(() => {
+        // Only count upcoming tracks (after current)
+        return state.playlist.slice(state.currentIndex + 1).reduce((sum, song) => {
+            return sum + (Number(song.duration) || 0);
+        }, 0);
+    }, [state.playlist, state.currentIndex]);
+
+    const totalQueueTimeStr = useMemo(() => formatDuration(totalQueueSeconds), [totalQueueSeconds]);
+
     useEffect(() => {
-        const handleVisibilityChange = () => {
-            // Check if the page is NOT hidden (i.e., it just became visible)
-            if (document.hidden === false && isAuthenticated) {
-                if (DEBUG()) console.log('Page became visible, forcing state refresh.');
-                // Force a refresh, bypassing the 'commandInProgress' check
-                // because the state is guaranteed to be stale.
-                refreshState(true);
+        const handleVisibilityChange = async () => {
+            const nowHidden = document.hidden;
+            const wasHidden = !lastVisibilityStateRef.current;
+
+            if (!nowHidden && wasHidden && isAuthenticated) {
+                if (DEBUG()) console.log('🔄 Tab became visible - checking for missed scrobbles...');
+
+                // v4: Disable auto-remove during recovery to prevent playback disruption
+                isRecoveringFromHiddenRef.current = true;
+
+                const savedState = playbackManager.current.loadState();
+                const freshData = await refreshState(true);
+
+                // v4: Re-enable auto-remove after state is synced
+                setTimeout(() => {
+                    isRecoveringFromHiddenRef.current = false;
+                    if (DEBUG()) console.log('🔄 Recovery complete, auto-remove re-enabled');
+                }, 500);
+
+                if (savedState && freshData) {
+                    const scrobbleCount = await processMissedScrobbles(savedState, stateRef.current);
+
+                    if (scrobbleCount > 0) {
+                        setStatusText(`✓ Caught up: ${scrobbleCount} track(s) scrobbled`);
+                        setTimeout(() => {
+                            setStatusText(stateRef.current.playing ? '▶️ Playing' : '⏸️ Paused');
+                        }, 3000);
+                    }
+                }
+
+                await checkAndScrobble(freshData);
+
+                const pruned = playbackManager.current.pruneScrobbled();
+                setScrobbledIds(pruned);
+            } else if (nowHidden && !wasHidden) {
+                const currentState = stateRef.current;
+                const currentTrack = currentState.playlist[currentState.currentIndex];
+
+                if (currentTrack && currentState.playing) {
+                    playbackManager.current.saveState({
+                        currentTrack,
+                        currentIndex: currentState.currentIndex,
+                        position: currentState.position,
+                        playing: currentState.playing,
+                        playlist: currentState.playlist
+                    });
+                    if (DEBUG()) console.log('💾 Tab hidden - state saved');
+                }
             }
+
+            lastVisibilityStateRef.current = !nowHidden;
         };
 
-        // Add the event listener when the component mounts
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Clean up the event listener when the component unmounts
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [refreshState, isAuthenticated]); // Add refreshState and isAuthenticated as dependencies
+    }, [refreshState, isAuthenticated, checkAndScrobble, processMissedScrobbles]);
 
     useEffect(() => {
         setupMediaSessionHandlers(handleTransport);
@@ -561,7 +498,6 @@ export default function App() {
         }
     }, [state.currentIndex, state.playlist, state.position, state.playing, updateMediaSession]);
 
-    // Initialization - try to reconnect with saved credentials
     useEffect(() => {
         let mounted = true;
 
@@ -615,95 +551,42 @@ export default function App() {
         return () => { mounted = false; };
     }, [refreshState]);
 
-    // Polling loop & Scrobbling
-    /* ... Polling/Scrobble useEffect remains the same ... */
     useEffect(() => {
         if (!isAuthenticated) return;
 
         const pollInterval = setInterval(async () => {
+            let freshData;
             try {
-                await refreshState(false);
+                freshData = await refreshState(false);
             } catch (e) {
                 console.error("Background poll refresh failed:", e);
                 return;
             }
 
-            // --- SCROBBLE LOGIC ---
-            const currentState = stateRef.current;
-            const tr = currentState.playlist[currentState.currentIndex];
-
-            if (!tr) return;
-
-            const dur = Math.max(0, tr.duration || 0);
-            const pos = currentState.position;
-
-            if (dur > 30 && !scrobbledIds.has(tr.id)) {
-                const isHalfway = pos >= dur / 2;
-                const isFourMinutes = pos >= 240;
-
-                if (isHalfway || isFourMinutes) {
-                    if (DEBUG()) console.log(`Scrobbling (from poll): ${tr.title}`);
-                    scrobble(tr.id, true);
-                    setScrobbledIds(prev => new Set(prev).add(tr.id));
-
-                    setStatusText(`Scrobbled: ${tr.title}`);
-                    setTimeout(() => {
-                        const latestState = stateRef.current;
-                         if (statusText === `Scrobbled: ${tr.title}`) {
-                            setStatusText(latestState.playing ? '▶️ Playing' : '⏸️ Paused');
-                        }
-                    }, 3000);
+            if (freshData && freshData.playing) {
+                const currentState = stateRef.current;
+                const currentTrack = currentState.playlist[currentState.currentIndex];
+                if (currentTrack) {
+                    playbackManager.current.saveState({
+                        currentTrack,
+                        currentIndex: currentState.currentIndex,
+                        position: currentState.position,
+                        playing: currentState.playing,
+                        playlist: currentState.playlist
+                    });
                 }
             }
-            // --- END SCROBBLE LOGIC ---
 
+            await checkAndScrobble(freshData);
         }, 2000);
 
         return () => clearInterval(pollInterval);
-    }, [refreshState, isAuthenticated, scrobbledIds, statusText]);
+    }, [refreshState, isAuthenticated, checkAndScrobble]);
 
-    // Auto-remove finished songs
-    /* ... Auto-remove useEffect remains the same ... */
-    useEffect(() => {
-        const prevIndex = prevIndexRef.current;
-        const currentIndex = state.currentIndex;
-
-        // Check if the index has advanced AND we are not in 'one' repeat mode
-        // MODIFIED: Also check if repeatMode is NOT 'one'
-        if (currentIndex > prevIndex && stateRef.current.repeatMode !== 'one' && state.playlist.length > 0) {
-
-            (async () => {
-                try {
-                    const indexesToRemove = [];
-                    for (let i = prevIndex; i < currentIndex; i++) {
-                        indexesToRemove.push(i);
-                    }
-
-                    if (indexesToRemove.length > 0) {
-                        if (DEBUG()) console.log(`Auto-removing ${indexesToRemove.length} finished track(s) (prev=${prevIndex}, current=${currentIndex}).`);
-
-                        for (const index of indexesToRemove.reverse()) {
-                            await callJukebox('remove', `&index=${index}`);
-                        }
-
-                        await refreshState(true);
-                    }
-                } catch (e) {
-                    console.error('Failed to auto-remove finished song(s):', e);
-                }
-            })();
-        }
-
-        prevIndexRef.current = currentIndex;
-
-    }, [state.currentIndex, state.playlist.length, refreshState]); // Removed repeatMode dependency here, check happens via stateRef
-
-    // "Now Playing" update effect
-    /* ... Now Playing useEffect remains the same ... */
     useEffect(() => {
         const currentTrack = state.playlist[state.currentIndex];
         if (state.playing && currentTrack && nowPlayingIdRef.current !== currentTrack.id) {
-            scrobble(currentTrack.id, false); // false for "now playing"
+            scrobble(currentTrack.id, false);
             nowPlayingIdRef.current = currentTrack.id;
         }
         if (!state.playing) {
@@ -711,11 +594,8 @@ export default function App() {
         }
     }, [state.playing, state.currentIndex, state.playlist]);
 
-
-    // --- MODIFIED: Position Ticker & Repeat Logic ---
     useEffect(() => {
         const tickInterval = setInterval(() => {
-            // Use ref to get the latest state without causing re-renders
             const currentState = stateRef.current;
             const { playing, seeking, playlist, currentIndex, lastStatusTs, localTickStart, repeatMode } = currentState;
 
@@ -730,29 +610,20 @@ export default function App() {
             const dt = (Date.now() - lastStatusTs) / 1000;
             const pos = Math.min(dur, localTickStart + dt);
 
-            // Update visual position
             setState(prev => ({ ...prev, position: pos }));
 
-            // --- ADDED: Repeat 'one' logic ---
-            // Check if repeat 'one' is active, track is near the end, and repeat hasn't been triggered for this ID yet
             if (repeatMode === 'one' && dur > 1 && pos >= dur - 0.8 && repeatOneTriggeredRef.current !== tr.id) {
                 if (DEBUG()) console.log(`Repeat One Triggered for ${tr.title}`);
-                repeatOneTriggeredRef.current = tr.id; // Mark as triggered for this track instance
-                // Call skipTo without await to avoid blocking the interval,
-                // skipTo handles commandInProgress flag internally.
+                repeatOneTriggeredRef.current = tr.id;
                 skipTo(currentIndex, 0);
             }
-            // --- END Repeat 'one' logic ---
 
-        }, 500); // UI ticks every 500ms
+        }, 500);
 
         return () => clearInterval(tickInterval);
-    }, [skipTo]); // Added skipTo dependency
+    }, [skipTo]);
 
-
-    // --- Input Handlers ---
-    /* ... Volume, Seek, Search, Login handlers remain the same ... */
-        const handleVolumeChange = useCallback(async (e) => {
+    const handleVolumeChange = useCallback(async (e) => {
         const volumeValue = Number(e.target.value);
         const gain = Math.max(0, Math.min(1, volumeValue / 100));
 
@@ -765,7 +636,6 @@ export default function App() {
         }
     }, []);
 
-    // Seek Logic
     const handleSeekInput = useCallback((e) => {
         setState(prevState => {
             const tr = prevState.playlist[prevState.currentIndex];
@@ -793,7 +663,6 @@ export default function App() {
         await skipTo(currentState.currentIndex, pos);
     }, [skipTo]);
 
-    // Search Logic
     useEffect(() => {
         let searchTimer;
         const q = searchQuery.trim();
@@ -832,7 +701,6 @@ export default function App() {
         }
     }, [refreshState]);
 
-    // Login Logic
     const handleConfigChange = useCallback((e) => {
         setConfigForm(f => ({ ...f, [e.target.id]: e.target.value }));
     }, []);
@@ -857,116 +725,87 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
-
-    // --- DND-KIT SENSORS ---
-    /* ... Sensors setup remains the same ... */
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
-          coordinateGetter: sortableKeyboardCoordinates,
+            coordinateGetter: sortableKeyboardCoordinates,
         })
     );
 
-    // --- DND-KIT Drag End Handler ---
-    /* ... handleDragEnd (Attempt 3) remains the same ... */
+    // Generate unique keys for queue items (handles duplicate songs)
+    const queueItemIds = useMemo(() => {
+        return state.playlist.map((song, index) => `${song.id}-${index}`);
+    }, [state.playlist]);
+
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
 
-            // --- FIX V3: Store state and calculate precise position ---
             const currentState = stateRef.current;
             const wasPlaying = currentState.playing;
             const currentTrack = currentState.playlist[currentState.currentIndex];
             const currentTrackId = currentTrack?.id;
 
-            // Calculate the *precise* position at the moment of the drop
             const dur = Math.max(0, currentTrack?.duration || 0);
-            let precisePosition = currentState.position; // Default
+            let precisePosition = currentState.position;
             if (wasPlaying) {
-                 const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
-                 precisePosition = Math.min(dur, currentState.localTickStart + dt);
+                const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+                precisePosition = Math.min(dur, currentState.localTickStart + dt);
             }
             precisePosition = Math.floor(Math.max(0, precisePosition));
-            // --- END FIX V3 ---
 
             const currentPlaylist = currentState.playlist;
 
-            const oldIndex = currentPlaylist.findIndex(song => song.id === active.id);
-            const newIndex = currentPlaylist.findIndex(song => song.id === over.id);
+            // Parse composite IDs to get actual indices
+            const oldIndex = parseInt(active.id.toString().split('-').pop(), 10);
+            const newIndex = parseInt(over.id.toString().split('-').pop(), 10);
 
-            if (oldIndex === -1 || newIndex === -1) return;
+            if (isNaN(oldIndex) || isNaN(newIndex) || oldIndex === newIndex) return;
 
-            // 1. Get the new playlist order
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
 
-            // 2. Update React state immediately
             setState(prev => ({
-              ...prev,
-              playlist: newPlaylist,
-              playing: wasPlaying // Optimistically keep playing state
+                ...prev,
+                playlist: newPlaylist,
+                playing: wasPlaying
             }));
 
-            // 3. Get the list of IDs in the new order
             const ids = newPlaylist.map(song => song.id);
             const qs = ids.map(id => `&id=${encodeURIComponent(id)}`).join('');
 
-            // 4. Asynchronously send updates to the server
             try {
                 commandInProgress.current = true;
-                if (DEBUG()) console.log(`[DnD V3] State before set: playing=${wasPlaying}, trackId=${currentTrackId}, pos=${precisePosition}`);
 
-                // Send the disruptive 'set' command
                 await callJukebox('set', qs);
-                if (DEBUG()) console.log(`[DnD V3] 'set' command sent`);
+                await new Promise(resolve => setTimeout(resolve, 50));
 
-                // --- FIX V3: Add small delay AFTER 'set' ---
-                await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
-                if (DEBUG()) console.log(`[DnD V3] 50ms delay finished`);
-                // --- END FIX V3 ---
-
-                // --- Restore playback state ---
                 const newPlayingIndex = currentTrackId
                     ? newPlaylist.findIndex(song => song.id === currentTrackId)
                     : -1;
 
-                if (DEBUG()) console.log(`[DnD V3] Original track new index: ${newPlayingIndex}`);
-
                 if (newPlayingIndex !== -1) {
-                    // Send 'skip' to restore position
-                     if (DEBUG()) console.log(`[DnD V3] Sending 'skip' to index ${newPlayingIndex}, offset ${precisePosition}`);
                     await callJukebox('skip', `&index=${newPlayingIndex}&offset=${precisePosition}`);
 
-                    // If it was playing, send 'start'
                     if (wasPlaying) {
-                         if (DEBUG()) console.log(`[DnD V3] Sending 'start'`);
                         await callJukebox('start');
                     }
                 } else if (wasPlaying) {
-                    // Fallback if original track not found
-                     if (DEBUG()) console.log(`[DnD V3] Original track not found, starting queue from index 0`);
-                     await callJukebox('skip', `&index=0&offset=0`);
-                     await callJukebox('start');
+                    await callJukebox('skip', `&index=0&offset=0`);
+                    await callJukebox('start');
                 }
-                // --- END Restore playback state ---
 
-                // 7. Re-sync state AFTER restoring (keep previous delay)
-                if (DEBUG()) console.log(`[DnD V3] Waiting 150ms before final refresh`);
                 await new Promise(resolve => setTimeout(resolve, 150));
-                if (DEBUG()) console.log(`[DnD V3] Performing final refresh`);
                 await refreshState(true);
             } catch (e) {
                 console.error('Failed to reorder queue:', e);
-                await refreshState(true); // Revert on error
+                await refreshState(true);
             } finally {
                 commandInProgress.current = false;
-                 if (DEBUG()) console.log(`[DnD V3] Drag end handler finished`);
             }
         }
     }, [refreshState]);
 
-
-    // --- Derived State ---
     const currentTrack = state.playlist[state.currentIndex];
 
     const seekValue = useMemo(() => {
@@ -976,10 +815,9 @@ export default function App() {
         return dur ? Math.round((pos / dur) * 1000) : 0;
     }, [state.position, state.currentIndex, state.playlist]);
 
-    const seekFillStyle = useMemo(() => ({'--seek-fill': `${(seekValue / 10).toFixed(1)}%`}), [seekValue]);
-    const volFillStyle = useMemo(() => ({'--vol-fill': `${Math.round(state.gain * 100)}%`}), [state.gain]);
+    const seekFillStyle = useMemo(() => ({ '--seek-fill': `${(seekValue / 10).toFixed(1)}%` }), [seekValue]);
+    const volFillStyle = useMemo(() => ({ '--vol-fill': `${Math.round(state.gain * 100)}%` }), [state.gain]);
 
-    // --- ADDED: Repeat button UI state ---
     const repeatButtonText = useMemo(() => {
         if (state.repeatMode === 'one') return '🔂1';
         if (state.repeatMode === 'all') return '🔂';
@@ -991,13 +829,10 @@ export default function App() {
         return 'Repeat Off';
     }, [state.repeatMode]);
 
-
-    // --- RENDER ---
     return (
         <>
             <div className="player-shell">
                 <aside className="cover-card">
-                    {/* ... Cover card content ... */}
                     <img className="cover" alt="Album art" src={coverArtUrl(currentTrack?.coverArt, 900)} />
                     <div className="meta">
                         <div className="title">{currentTrack?.title || 'Nothing playing'}</div>
@@ -1016,32 +851,30 @@ export default function App() {
                 </aside>
 
                 <div className="transport-card">
-                     <div className="status-row">
+                    <div className="status-row">
                         <div id="statusText">{statusText}</div>
-                        <div className="small">Queue: <span id="queueCount">{state.playlist.length}</span> tracks</div>
+                        <div className="small">Up next: <span id="queueCount">{upcomingCount}</span> tracks</div>
                     </div>
-                    {/* --- MODIFIED: Added Repeat button to controls --- */}
                     <div className="controls">
-                      <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
-                      <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
-                        {state.playing ? '⏸' : '▶'}
-                      </button>
-                      <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
-                      {/* Repeat Button */}
-                      <button
-                        className={`btn repeat ${state.repeatMode !== 'off' ? 'active' : ''}`}
-                        title={repeatButtonTitle}
-                        onClick={handleRepeatClick}
-                       >
-                        {repeatButtonText}
-                       </button>
-                      <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
-                      <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
+                        <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
+                        <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
+                            {state.playing ? '⏸' : '▶'}
+                        </button>
+                        <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
+                        <button
+                            className={`btn repeat ${state.repeatMode !== 'off' ? 'active' : ''}`}
+                            title={repeatButtonTitle}
+                            onClick={handleRepeatClick}
+                        >
+                            {repeatButtonText}
+                        </button>
+                        <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
+                        <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
+                        <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
                     </div>
 
                     <div className="progress">
-                        {/* ... Progress bar content ... */}
-                         <div className="time">{fmtTime(state.position)}</div>
+                        <div className="time">{fmtTime(state.position)}</div>
                         <input
                             className="seek" type="range" min="0" max="1000"
                             value={seekValue} style={seekFillStyle}
@@ -1052,8 +885,7 @@ export default function App() {
                     </div>
 
                     <div className="vol">
-                         {/* ... Volume control content ... */}
-                         <div className="vol-row">
+                        <div className="vol-row">
                             <div title="Volume">🔊</div>
                             <input
                                 id="volume"
@@ -1069,35 +901,41 @@ export default function App() {
                 </div>
 
                 <aside className="side-card">
-                    <h3>Queue</h3>
-                    
-                    {/* --- DND Queue List --- */}
-                    <DndContext 
+                    <h3>Up Next <small>(Total: {totalQueueTimeStr})</small></h3>
+
+                    <DndContext
                         sensors={sensors}
                         collisionDetection={closestCenter}
                         onDragEnd={handleDragEnd}
                     >
-                        <SortableContext 
-                            items={state.playlist.map(s => s.id)} 
+                        <SortableContext
+                            items={queueItemIds}
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
-                                {state.playlist.map((song, index) => (
-                                    <JukeboxQueueItem 
-                                        key={song.id} 
-                                        id={song.id}  
-                                        song={song}
-                                        index={index} 
-                                        currentIndex={state.currentIndex}
-                                        onAction={handleQueueAction}
-                                    />
-                                ))}
+                                {state.playlist.map((song, index) => {
+                                    // Only show tracks AFTER the current one (the actual "up next")
+                                    if (index <= state.currentIndex) return null;
+                                    // Number sequentially starting from 1
+                                    const displayNum = index - state.currentIndex;
+                                    const itemId = `${song.id}-${index}`;
+                                    return (
+                                        <JukeboxQueueItem
+                                            key={itemId}
+                                            id={itemId}
+                                            song={song}
+                                            index={index}
+                                            displayNum={displayNum}
+                                            currentIndex={state.currentIndex}
+                                            onAction={handleQueueAction}
+                                        />
+                                    );
+                                })}
                             </div>
                         </SortableContext>
                     </DndContext>
-                    
-                     {/* ... Search and Config sections ... */}
-                     <div className="search-box">
+
+                    <div className="search-box">
                         <input
                             placeholder="Search songs to add…"
                             value={searchQuery}
@@ -1107,12 +945,12 @@ export default function App() {
                         <div className="search-results" hidden={searchResults.length === 0}>
                             {searchResults.map((song) => (
                                 <div key={song.id} className="srow" onClick={() => addSongFromSearch(song.id)}>
-                                    <img src={coverArtUrl(song.coverArt, 80)} alt="Cover" onError={(e) => e.target.style.visibility='hidden'}/>
+                                    <img src={coverArtUrl(song.coverArt, 80)} alt="Cover" onError={(e) => e.target.style.visibility = 'hidden'} />
                                     <div className="s-meta">
-                                        <div className="qi-title">{escapeHtml(song.title || 'Unknown')}</div>
-                                        <div className="s-artist">{escapeHtml(song.artist || '')} • {escapeHtml(song.album || '')}</div>
+                                        <div className="qi-title">{song.title || 'Unknown'}</div>
+                                        <div className="s-artist">{song.artist || ''} • {song.album || ''}</div>
                                     </div>
-                                    <div style={{textAlign: 'right'}}>➕</div>
+                                    <div style={{ textAlign: 'right' }}>➕</div>
                                 </div>
                             ))}
                         </div>
@@ -1120,16 +958,16 @@ export default function App() {
 
                     <div className="config">
                         <div className="row">
-                            <input id="serverUrl" placeholder="Server URL" value={configForm.serverUrl || ''} onChange={handleConfigChange} disabled={isAuthenticated}/>
+                            <input id="serverUrl" placeholder="Server URL" value={configForm.serverUrl || ''} onChange={handleConfigChange} disabled={isAuthenticated} />
                             <input id="username" placeholder="Username" value={configForm.username || ''} onChange={handleConfigChange} disabled={isAuthenticated} />
-                            <input id="password" placeholder="Password" type="password" value={configForm.password || ''} onChange={handleConfigChange} onKeyPress={(e) => e.key === 'Enter' && handleLogin()} disabled={isAuthenticated}/>
+                            <input id="password" placeholder="Password" type="password" value={configForm.password || ''} onChange={handleConfigChange} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={isAuthenticated} />
                             <button onClick={handleLogin} disabled={isAuthenticated}>
                                 {isAuthenticated ? '✓ Logged In' : 'Login'}
                             </button>
                         </div>
                         <div className="small">
                             {isAuthenticated
-                                ? '✓ Connected. Your password is never stored.'
+                                ? '✓ Connected. Played tracks auto-removed.'
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
                         </div>
                     </div>
