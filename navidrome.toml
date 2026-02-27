@@ -1,4 +1,4 @@
-# navidrome.toml — приклад конфігурації
+# navidrome.toml — приклад конфігурації 
 
 # Базові налаштування
 MusicFolder = "/music"
@@ -25,7 +25,7 @@ MPVPath = "/usr/bin/mpv"
 MPVCmdTemplate = "mpv --no-video --audio-device=%d --input-ipc-server=%s %f"
 
 # Інші опції
-SessionTimeout = "48h"
+SessionTimeout = "24h"
 EnableDownloads = true
 EnableExternalServices = true
 EnableCORS = true
