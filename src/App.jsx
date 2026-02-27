@@ -1,383 +1,38 @@
-// src/App.jsx - v4: Fixed playback pause on tab switch
+// src/App.jsx - v5: Modular refactor — no functional or design changes
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
-const API_VERSION = '1.16.1';
-const CACHE_VERSION = 'v2'; // Increment this to invalidate old cache
-const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
-
-// Cache key helpers with versioning
-const cacheKey = (key) => `jukebox_${CACHE_VERSION}_${key}`;
-
-// Clear old cache versions on load
-function clearOldCache() {
-    const keysToCheck = ['jukeboxConfig', 'jukeboxPlaybackState', 'jukeboxScrobbled'];
-    keysToCheck.forEach(key => {
-        if (localStorage.getItem(key)) {
-            localStorage.removeItem(key);
-            if (DEBUG()) console.log(`Cleared old cache key: ${key}`);
-        }
-    });
-    // Clear any old versioned keys
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('jukebox_') && !key.startsWith(`jukebox_${CACHE_VERSION}_`)) {
-            localStorage.removeItem(key);
-            if (DEBUG()) console.log(`Cleared old versioned cache: ${key}`);
-        }
-    }
-}
-
-// Initialize cache cleanup
-clearOldCache();
-
-let config = JSON.parse(localStorage.getItem(cacheKey('config'))) || {
-    serverUrl: '',
-    username: '',
-    token: '',
-    salt: ''
-};
-
-function md5(string) {
-    function rotateLeft(lValue, iShiftBits) {
-        return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits));
-    }
-    function addUnsigned(lX, lY) {
-        const lX8 = (lX & 0x80000000); const lY8 = (lY & 0x80000000);
-        const lX4 = (lX & 0x40000000); const lY4 = (lY & 0x40000000);
-        const lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF);
-        if (lX4 & lY4) { return (lResult ^ 0x80000000 ^ lX8 ^ lY8); }
-        if (lX4 | lY4) { if (lResult & 0x40000000) { return (lResult ^ 0xC0000000 ^ lX8 ^ lY8); } else { return (lResult ^ 0x40000000 ^ lX8 ^ lY8); } } else { return (lResult ^ lX8 ^ lY8); }
-    }
-    function F(x, y, z) { return (x & y) | ((~x) & z); }
-    function G(x, y, z) { return (x & z) | (y & (~z)); }
-    function H(x, y, z) { return (x ^ y ^ z); }
-    function I(x, y, z) { return (y ^ (x | (~z))); }
-    function FF(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function GG(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function HH(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function II(a, b, c, d, x, s, ac) { a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac)); return addUnsigned(rotateLeft(a, s), b); }
-    function convertToWordArray(string) {
-        let lWordCount; const lMessageLength = string.length;
-        const lNumberOfWords_temp1 = lMessageLength + 8; const lNumberOfWords_temp2 = (lNumberOfWords_temp1 - (lNumberOfWords_temp1 % 64)) / 64;
-        const lNumberOfWords = (lNumberOfWords_temp2 + 1) * 16; const lWordArray = new Array(lNumberOfWords - 1);
-        let lBytePosition = 0; let lByteCount = 0;
-        while (lByteCount < lMessageLength) { lWordCount = (lByteCount - (lByteCount % 4)) / 4; lBytePosition = (lByteCount % 4) * 8; lWordArray[lWordCount] = (lWordArray[lWordCount] | (string.charCodeAt(lByteCount) << lBytePosition)); lByteCount++; }
-        lWordCount = (lByteCount - (lByteCount % 4)) / 4; lBytePosition = (lByteCount % 4) * 8;
-        lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition); lWordArray[lNumberOfWords - 2] = lMessageLength << 3; lWordArray[lNumberOfWords - 1] = lMessageLength >>> 29; return lWordArray;
-    }
-    function wordToHex(lValue) {
-        let wordToHexValue = "", wordToHexValue_temp = "", lByte, lCount;
-        for (lCount = 0; lCount <= 3; lCount++) { lByte = (lValue >>> (lCount * 8)) & 255; wordToHexValue_temp = "0" + lByte.toString(16); wordToHexValue = wordToHexValue + wordToHexValue_temp.substr(wordToHexValue_temp.length - 2, 2); }
-        return wordToHexValue;
-    }
-    function utf8Encode(string) {
-        string = string.replace(/\r\n/g, "\n"); let utftext = "";
-        for (let n = 0; n < string.length; n++) {
-            const c = string.charCodeAt(n);
-            if (c < 128) { utftext += String.fromCharCode(c); } else if ((c > 127) && (c < 2048)) { utftext += String.fromCharCode((c >> 6) | 192); utftext += String.fromCharCode((c & 63) | 128); } else { utftext += String.fromCharCode((c >> 12) | 224); utftext += String.fromCharCode(((c >> 6) & 63) | 128); utftext += String.fromCharCode((c & 63) | 128); }
-        } return utftext;
-    }
-    let x = []; let k, AA, BB, CC, DD, a, b, c, d;
-    const S11 = 7, S12 = 12, S13 = 17, S14 = 22; const S21 = 5, S22 = 9, S23 = 14, S24 = 20;
-    const S31 = 4, S32 = 11, S33 = 16, S34 = 23; const S41 = 6, S42 = 10, S43 = 15, S44 = 21;
-    string = utf8Encode(string); x = convertToWordArray(string);
-    a = 0x67452301; b = 0xEFCDAB89; c = 0x98BADCFE; d = 0x10325476;
-    for (k = 0; k < x.length; k += 16) {
-        AA = a; BB = b; CC = c; DD = d;
-        a = FF(a, b, c, d, x[k + 0], S11, 0xD76AA478); d = FF(d, a, b, c, x[k + 1], S12, 0xE8C7B756); c = FF(c, d, a, b, x[k + 2], S13, 0x242070DB); b = FF(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE); a = FF(a, b, c, d, x[k + 4], S11, 0xF57C0FAF); d = FF(d, a, b, c, x[k + 5], S12, 0x4787C62A); c = FF(c, d, a, b, x[k + 6], S13, 0xA8304613); b = FF(b, c, d, a, x[k + 7], S14, 0xFD469501); a = FF(a, b, c, d, x[k + 8], S11, 0x698098D8); d = FF(d, a, b, c, x[k + 9], S12, 0x8B44F7AF); c = FF(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1); b = FF(b, c, d, a, x[k + 11], S14, 0x895CD7BE); a = FF(a, b, c, d, x[k + 12], S11, 0x6B901122); d = FF(d, a, b, c, x[k + 13], S12, 0xFD987193); c = FF(c, d, a, b, x[k + 14], S13, 0xA679438E); b = FF(b, c, d, a, x[k + 15], S14, 0x49B40821);
-        a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562); d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340); c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51); b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA); a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D); d = GG(d, a, b, c, x[k + 10], S22, 0x02441453); c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681); b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8); a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6); d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6); c = GG(c, d, a, b, x[k + 3], S23, 0xF4D50D87); b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED); a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905); d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8); c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9); b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
-        a = HH(a, b, c, d, x[k + 5], S31, 0xFFFA3942); d = HH(d, a, b, c, x[k + 8], S32, 0x8771F681); c = HH(c, d, a, b, x[k + 11], S33, 0x6D9D6122); b = HH(b, c, d, a, x[k + 14], S34, 0xFDE5380C); a = HH(a, b, c, d, x[k + 1], S31, 0xA4BEEA44); d = HH(d, a, b, c, x[k + 4], S32, 0x4BDECFA9); c = HH(c, d, a, b, x[k + 7], S33, 0xF6BB4B60); b = HH(b, c, d, a, x[k + 10], S34, 0xBEBFBC70); a = HH(a, b, c, d, x[k + 13], S31, 0x289B7EC6); d = HH(d, a, b, c, x[k + 0], S32, 0xEAA127FA); c = HH(c, d, a, b, x[k + 3], S33, 0xD4EF3085); b = HH(b, c, d, a, x[k + 6], S34, 0x04881D05); a = HH(a, b, c, d, x[k + 9], S31, 0xD9D4D039); d = HH(d, a, b, c, x[k + 12], S32, 0xE6DB99E5); c = HH(c, d, a, b, x[k + 15], S33, 0x1FA27CF8); b = HH(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
-        a = II(a, b, c, d, x[k + 0], S41, 0xF4292244); d = II(d, a, b, c, x[k + 7], S42, 0x432AFF97); c = II(c, d, a, b, x[k + 14], S43, 0xAB9423A7); b = II(b, c, d, a, x[k + 5], S44, 0xFC93A039); a = II(a, b, c, d, x[k + 12], S41, 0x655B59C3); d = II(d, a, b, c, x[k + 3], S42, 0x8F0CCC92); c = II(c, d, a, b, x[k + 10], S43, 0xFFEFF47D); b = II(b, c, d, a, x[k + 1], S44, 0x85845DD1); a = II(a, b, c, d, x[k + 8], S41, 0x6FA87E4F); d = II(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0); c = II(c, d, a, b, x[k + 6], S43, 0xA3014314); b = II(b, c, d, a, x[k + 13], S44, 0x4E0811A1); a = II(a, b, c, d, x[k + 4], S41, 0xF7537E82); d = II(d, a, b, c, x[k + 11], S42, 0xBD3AF235); c = II(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB); b = II(b, c, d, a, x[k + 9], S44, 0xEB86D391);
-        a = addUnsigned(a, AA); b = addUnsigned(b, BB); c = addUnsigned(c, CC); d = addUnsigned(d, DD);
-    }
-    const temp = wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d);
-    return temp.toLowerCase();
-}
-
-function generateSalt() { return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15); }
-function generateToken(password, salt) { return md5(password + salt); }
-function isSessionValid() { return !!(config.token && config.salt && config.username); }
-function clearSession() {
-    const serverUrl = config.serverUrl;
-    localStorage.removeItem(cacheKey('config'));
-    config = { serverUrl: serverUrl, username: '', token: '', salt: '' };
-    if (DEBUG()) console.log('Session cleared');
-}
-function escapeHtml(s) { return String(s); }
-function buildJukeboxUrl(action, extra = '') {
-    if (!config.token || !config.salt) throw new Error('Not authenticated');
-    const base = `${config.serverUrl}/rest/jukeboxControl?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
-    return `${base}&action=${action}${extra}`;
-}
-function coverArtUrl(id, size = 512) {
-    if (!id || !config.token || !config.salt) return '';
-    return `${config.serverUrl}/rest/getCoverArt?id=${encodeURIComponent(id)}&size=${size}&u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox`;
-}
-async function callJukebox(action, extra = '') {
-    if (!isSessionValid()) throw new Error('Not authenticated');
-    const url = buildJukeboxUrl(action, extra);
-    try {
-        const res = await fetch(url);
-        if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        const data = await res.json();
-        if (DEBUG()) console.log(`API ${action} response:`, data);
-        const resp = data?.['subsonic-response'];
-        if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Unknown API error'; throw new Error(`API failed: ${errorMsg}`); }
-        const playlistObj = resp.jukeboxPlaylist || {};
-        const statusObj = resp.jukeboxStatus || playlistObj;
-        const status = { currentIndex: statusObj.currentIndex ?? 0, playing: statusObj.playing ?? false, gain: statusObj.gain ?? 1, position: statusObj.position ?? 0, };
-        const playlist = { entry: playlistObj.entry || [] };
-        return { status, playlist };
-    } catch (error) { if (error.message === 'Authentication failed') { throw error; } throw error; }
-}
-async function getRandomSongFromServer() {
-    if (!isSessionValid()) throw new Error('Not authenticated');
-    const url = `${config.serverUrl}/rest/getRandomSongs?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&size=1`;
-    const res = await fetch(url);
-    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-    const data = await res.json();
-    const resp = data?.['subsonic-response'];
-    if (resp?.status !== 'ok') throw new Error(`API failed: ${resp?.error?.message || 'Unknown error'}`);
-    const song = Array.isArray(resp.randomSongs?.song) ? resp.randomSongs.song[0] : resp.randomSongs?.song;
-    if (!song || !song.id) throw new Error('Server returned no songs.');
-    return song;
-}
-async function addRandomSong() {
-    const randomSong = await getRandomSongFromServer();
-    const resp = await callJukebox('add', `&id=${encodeURIComponent(randomSong.id)}`);
-    return { randomSong, resp };
-}
-async function searchSongs(query) {
-    if (query.length < 2) return [];
-    if (!isSessionValid()) throw new Error('Not authenticated');
-    const url = `${config.serverUrl}/rest/search3?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&query=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
-    const data = await res.json();
-    return data?.['subsonic-response']?.searchResult3?.song || [];
-}
-async function scrobble(id, submission = false) {
-    if (!isSessionValid() || !id) {
-        if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.');
-        return;
-    }
-    const extra = `&id=${encodeURIComponent(id)}&submission=${submission}`;
-    const url = `${config.serverUrl}/rest/scrobble?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json${extra}`;
-    try {
-        const res = await fetch(url);
-        if (!res.ok) { if (DEBUG()) console.warn(`Scrobble API returned HTTP ${res.status}`); return; }
-        const data = await res.json();
-        const resp = data?.['subsonic-response'];
-        if (DEBUG()) { const type = submission ? 'Scrobble' : 'Now Playing'; console.log(`${type} response for ID ${id}:`, data); }
-        if (resp?.status !== 'ok') { if (DEBUG()) console.warn(`Scrobble API error: ${resp?.error?.message}`); }
-    } catch (error) { if (DEBUG()) console.error('Scrobble call failed:', error.message); }
-}
-function getConfig() { return { serverUrl: config.serverUrl, username: config.username }; }
-async function authenticate(serverUrl, username, password) {
-    if (!username || !password) throw new Error('Username and password are required');
-    serverUrl = serverUrl || '';
-    const salt = generateSalt();
-    const token = generateToken(password, salt);
-    const testUrl = `${serverUrl}/rest/ping?u=${encodeURIComponent(username)}&t=${token}&s=${salt}&v=${API_VERSION}&c=ModernJukebox&f=json`;
-    const res = await fetch(testUrl);
-    if (!res.ok) throw new Error(`Server error: ${res.status} ${res.statusText}`);
-    const data = await res.json();
-    const resp = data?.['subsonic-response'];
-    if (resp?.status !== 'ok') { const errorMsg = resp?.error?.message || 'Authentication failed'; throw new Error(errorMsg); }
-    config = { serverUrl, username, token, salt };
-    localStorage.setItem(cacheKey('config'), JSON.stringify(config));
-    if (DEBUG()) { console.log('Authentication successful'); console.log('Token:', token); console.log('Salt:', salt); }
-    return config;
-}
-async function reconnect() {
-    if (!isSessionValid()) return false;
-    try { await callJukebox('get'); return true; } catch (error) { clearSession(); return false; }
-}
-
-function fmtTime(sec) {
-    sec = Math.max(0, Math.floor(sec));
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function formatDuration(sec) {
-    sec = Math.max(0, Math.floor(sec));
-    
-    const days = Math.floor(sec / 86400);
-    sec %= 86400;
-    
-    const hours = Math.floor(sec / 3600);
-    sec %= 3600;
-    
-    const minutes = Math.floor(sec / 60);
-    
-    const parts = [];
-    
-    if (days > 0) {
-        parts.push(`${days}d`);
-    }
-    if (hours > 0) {
-        parts.push(`${hours}h`);
-    }
-    if (minutes > 0 || parts.length === 0) {
-        parts.push(`${minutes}m`);
-    }
-    
-    return parts.join(' ');
-}
-
-// ============ ENHANCED PLAYBACK STATE MANAGEMENT ============
-class PlaybackStateManager {
-    constructor() {
-        this.storageKey = cacheKey('playbackState');
-        this.scrobbledKey = cacheKey('scrobbled');
-    }
-
-    saveState(state) {
-        try {
-            const saveData = {
-                currentTrackId: state.currentTrack?.id,
-                currentTrackTitle: state.currentTrack?.title,
-                currentTrackDuration: state.currentTrack?.duration,
-                currentIndex: state.currentIndex,
-                position: state.position,
-                playing: state.playing,
-                timestamp: Date.now(),
-                queueSnapshot: state.playlist.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    duration: t.duration
-                }))
-            };
-            localStorage.setItem(this.storageKey, JSON.stringify(saveData));
-            if (DEBUG()) console.log('State saved to localStorage:', saveData);
-        } catch (e) {
-            console.error('Failed to save state:', e);
-        }
-    }
-
-    loadState() {
-        try {
-            const stored = localStorage.getItem(this.storageKey);
-            if (!stored) return null;
-            const data = JSON.parse(stored);
-            // Validate timestamp - discard if older than 24 hours
-            if (data.timestamp && (Date.now() - data.timestamp) > 86400000) {
-                localStorage.removeItem(this.storageKey);
-                return null;
-            }
-            if (DEBUG()) console.log('State loaded from localStorage:', data);
-            return data;
-        } catch (e) {
-            console.error('Failed to load state:', e);
-            localStorage.removeItem(this.storageKey);
-            return null;
-        }
-    }
-
-    calculateMissedTracks(savedState, currentState) {
-        if (!savedState || !savedState.playing) return [];
-        
-        const elapsed = (Date.now() - savedState.timestamp) / 1000;
-        if (elapsed < 30) return [];
-        
-        if (DEBUG()) console.log(`Time elapsed since last save: ${elapsed.toFixed(0)}s`);
-        
-        const missedTracks = [];
-        let remainingTime = elapsed;
-        let checkIndex = savedState.currentIndex;
-        let startPosition = savedState.position || 0;
-        
-        while (remainingTime > 0 && checkIndex < savedState.queueSnapshot.length) {
-            const track = savedState.queueSnapshot[checkIndex];
-            if (!track) break;
-            
-            const trackDuration = track.duration || 0;
-            const timeLeftInTrack = trackDuration - startPosition;
-            
-            if (remainingTime >= timeLeftInTrack) {
-                missedTracks.push({
-                    id: track.id,
-                    title: track.title,
-                    duration: trackDuration,
-                    playedTo: trackDuration
-                });
-                remainingTime -= timeLeftInTrack;
-                checkIndex++;
-                startPosition = 0;
-            } else {
-                missedTracks.push({
-                    id: track.id,
-                    title: track.title,
-                    duration: trackDuration,
-                    playedTo: startPosition + remainingTime
-                });
-                break;
-            }
-        }
-        
-        if (DEBUG() && missedTracks.length > 0) {
-            console.log('Calculated missed tracks:', missedTracks);
-        }
-        
-        return missedTracks;
-    }
-
-    getScrobbled() {
-        try {
-            const stored = localStorage.getItem(this.scrobbledKey);
-            return stored ? new Set(JSON.parse(stored)) : new Set();
-        } catch (e) {
-            localStorage.removeItem(this.scrobbledKey);
-            return new Set();
-        }
-    }
-
-    saveScrobbled(scrobbledIds) {
-        try {
-            localStorage.setItem(this.scrobbledKey, JSON.stringify([...scrobbledIds]));
-        } catch (e) {
-            console.error('Failed to save scrobbled IDs:', e);
-        }
-    }
-
-    addScrobbled(id) {
-        const scrobbled = this.getScrobbled();
-        scrobbled.add(id);
-        this.saveScrobbled(scrobbled);
-        return scrobbled;
-    }
-
-    pruneScrobbled() {
-        const scrobbled = this.getScrobbled();
-        if (scrobbled.size > 100) {
-            const arr = [...scrobbled];
-            const keep = new Set(arr.slice(-100));
-            this.saveScrobbled(keep);
-            return keep;
-        }
-        return scrobbled;
-    }
-}
+// Modular imports
+import {
+    DEBUG,
+    coverArtUrl,
+    callJukebox,
+    addRandomSong,
+    searchSongs,
+    scrobble,
+    getConfig,
+    authenticate,
+    reconnect,
+    isSessionValid,
+    clearSession,
+} from './api/subsonic.js';
+import { fmtTime, formatDuration } from './utils/helpers.js';
+import { PlaybackStateManager } from './utils/playbackManager.js';
+import { JukeboxQueueItem } from './components/QueueItem.jsx';
 
 const initialState = {
     playlist: [],
@@ -392,58 +47,6 @@ const initialState = {
     endHandledForId: null,
     lastPlayingTrackId: null, // Track the last playing track for auto-remove
 };
-
-function JukeboxQueueItem({ song, index, displayNum, currentIndex, onAction, id }) {
-    const isCurrent = index === currentIndex;
-
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        touchAction: 'none',
-    };
-
-    const className = `qitem${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`;
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            {...attributes}
-            {...listeners}
-            className={className}
-            data-index={index}
-        >
-            <div className="idx">{displayNum}</div>
-            <div>
-                <div className="qi-title">{escapeHtml(song.title || 'Unknown')}</div>
-                <div className="qi-meta">{escapeHtml(song.artist || 'Unknown')}</div>
-            </div>
-            <div className="qi-actions">
-                <button
-                    title="Play here"
-                    className="btn"
-                    onClick={(e) => { e.stopPropagation(); onAction('play', index); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                >▶️</button>
-                <button
-                    title="Remove"
-                    className="btn"
-                    onClick={(e) => { e.stopPropagation(); onAction('remove', index); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                >✖️</button>
-            </div>
-        </div>
-    );
-}
 
 export default function App() {
     const [state, setState] = useState(initialState);
@@ -465,7 +68,7 @@ export default function App() {
     const isRecoveringFromHiddenRef = useRef(false);
 
     useEffect(() => { stateRef.current = state; }, [state]);
-    
+
     useEffect(() => {
         const stored = playbackManager.current.getScrobbled();
         setScrobbledIds(stored);
@@ -539,7 +142,7 @@ export default function App() {
                             skipTo(currentState.currentIndex, details.seekTime);
                         }
                     });
-                } catch (e) {}
+                } catch (e) { }
 
                 try {
                     navigator.mediaSession.setActionHandler('seekbackward', () => {
@@ -547,7 +150,7 @@ export default function App() {
                         const newPos = Math.max(0, currentState.position - 10);
                         skipTo(currentState.currentIndex, newPos);
                     });
-                } catch (e) {}
+                } catch (e) { }
 
                 try {
                     navigator.mediaSession.setActionHandler('seekforward', () => {
@@ -557,7 +160,7 @@ export default function App() {
                         const newPos = Math.min(maxPos, currentState.position + 10);
                         skipTo(currentState.currentIndex, newPos);
                     });
-                } catch (e) {}
+                } catch (e) { }
             } catch (error) {
                 console.error('Error setting up Media Session handlers:', error);
             }
@@ -567,17 +170,17 @@ export default function App() {
     // Auto-remove finished track from queue
     const removeFinishedTrack = useCallback(async (trackId) => {
         if (!trackId || commandInProgress.current) return;
-        
+
         const currentState = stateRef.current;
         const trackIndex = currentState.playlist.findIndex(t => t.id === trackId);
-        
+
         if (trackIndex === -1 || trackIndex >= currentState.currentIndex) {
             // Track not found or hasn't been passed yet
             return;
         }
-        
+
         if (DEBUG()) console.log(`Auto-removing finished track at index ${trackIndex}: ${trackId}`);
-        
+
         try {
             commandInProgress.current = true;
             await callJukebox('remove', `&index=${trackIndex}`);
@@ -601,7 +204,7 @@ export default function App() {
             const newPlaylist = Array.isArray(playlist?.entry)
                 ? playlist.entry
                 : (playlist?.entry ? [playlist.entry] : []);
-            
+
             const currentTrack = newPlaylist[status.currentIndex || 0];
             const prevState = stateRef.current;
             const prevTrack = prevState.playlist[prevState.currentIndex];
@@ -667,7 +270,7 @@ export default function App() {
 
     const scrobbleTrack = useCallback(async (trackId, title, duration, playedTo) => {
         if (!trackId || duration <= 30) return false;
-        
+
         if (scrobbledIds.has(trackId)) {
             if (DEBUG()) console.log(`Already scrobbled: ${title}`);
             return false;
@@ -679,28 +282,28 @@ export default function App() {
         if (isHalfway || isFourMinutes) {
             if (DEBUG()) console.log(`✓ Scrobbling: ${title} (${playedTo.toFixed(1)}s/${duration}s)`);
             await scrobble(trackId, true);
-            
+
             const newScrobbled = playbackManager.current.addScrobbled(trackId);
             setScrobbledIds(newScrobbled);
-            
+
             return true;
         }
-        
+
         return false;
     }, [scrobbledIds]);
 
     const processMissedScrobbles = useCallback(async (savedState, currentState) => {
         if (!savedState) return 0;
-        
+
         const missedTracks = playbackManager.current.calculateMissedTracks(savedState, currentState);
-        
+
         if (missedTracks.length === 0) {
             if (DEBUG()) console.log('No missed tracks to scrobble');
             return 0;
         }
 
         let scrobbleCount = 0;
-        
+
         for (const track of missedTracks) {
             const scrobbled = await scrobbleTrack(track.id, track.title, track.duration, track.playedTo);
             if (scrobbled) {
@@ -710,11 +313,11 @@ export default function App() {
                 }
             }
         }
-        
+
         if (scrobbleCount > 0) {
             console.log(`✓ Caught up: Scrobbled ${scrobbleCount} missed track(s)`);
         }
-        
+
         return scrobbleCount;
     }, [scrobbleTrack]);
 
@@ -752,7 +355,7 @@ export default function App() {
                 setState(prev => ({ ...prev, playing: !prev.playing }));
             } else if (action === 'next') {
                 await callJukebox('skip', `&index=${currentState.currentIndex + 1}&offset=0`);
-                 repeatOneTriggeredRef.current = null;
+                repeatOneTriggeredRef.current = null;
             } else if (action === 'previous') {
                 const restart = (currentState.position || 0) > 3;
                 if (restart) {
@@ -760,7 +363,7 @@ export default function App() {
                 } else {
                     await callJukebox('skip', `&index=${Math.max(0, currentState.currentIndex - 1)}&offset=0`);
                 }
-                 repeatOneTriggeredRef.current = null;
+                repeatOneTriggeredRef.current = null;
             } else if (action === 'clear') {
                 await callJukebox('clear');
                 setStatusText('Queue cleared');
@@ -797,7 +400,7 @@ export default function App() {
                 await callJukebox('remove', `&index=${index}`);
                 await refreshState(true);
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e);
         } finally {
             commandInProgress.current = false;
@@ -823,30 +426,30 @@ export default function App() {
     }, [state.playlist, state.currentIndex]);
 
     const totalQueueTimeStr = useMemo(() => formatDuration(totalQueueSeconds), [totalQueueSeconds]);
-    
+
     useEffect(() => {
         const handleVisibilityChange = async () => {
             const nowHidden = document.hidden;
             const wasHidden = !lastVisibilityStateRef.current;
-            
+
             if (!nowHidden && wasHidden && isAuthenticated) {
                 if (DEBUG()) console.log('🔄 Tab became visible - checking for missed scrobbles...');
-                
+
                 // v4: Disable auto-remove during recovery to prevent playback disruption
                 isRecoveringFromHiddenRef.current = true;
-                
+
                 const savedState = playbackManager.current.loadState();
                 const freshData = await refreshState(true);
-                
+
                 // v4: Re-enable auto-remove after state is synced
                 setTimeout(() => {
                     isRecoveringFromHiddenRef.current = false;
                     if (DEBUG()) console.log('🔄 Recovery complete, auto-remove re-enabled');
                 }, 500);
-                
+
                 if (savedState && freshData) {
                     const scrobbleCount = await processMissedScrobbles(savedState, stateRef.current);
-                    
+
                     if (scrobbleCount > 0) {
                         setStatusText(`✓ Caught up: ${scrobbleCount} track(s) scrobbled`);
                         setTimeout(() => {
@@ -854,15 +457,15 @@ export default function App() {
                         }, 3000);
                     }
                 }
-                
+
                 await checkAndScrobble(freshData);
-                
+
                 const pruned = playbackManager.current.pruneScrobbled();
                 setScrobbledIds(pruned);
             } else if (nowHidden && !wasHidden) {
                 const currentState = stateRef.current;
                 const currentTrack = currentState.playlist[currentState.currentIndex];
-                
+
                 if (currentTrack && currentState.playing) {
                     playbackManager.current.saveState({
                         currentTrack,
@@ -874,7 +477,7 @@ export default function App() {
                     if (DEBUG()) console.log('💾 Tab hidden - state saved');
                 }
             }
-            
+
             lastVisibilityStateRef.current = !nowHidden;
         };
 
@@ -1126,7 +729,7 @@ export default function App() {
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
-          coordinateGetter: sortableKeyboardCoordinates,
+            coordinateGetter: sortableKeyboardCoordinates,
         })
     );
 
@@ -1148,8 +751,8 @@ export default function App() {
             const dur = Math.max(0, currentTrack?.duration || 0);
             let precisePosition = currentState.position;
             if (wasPlaying) {
-                 const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
-                 precisePosition = Math.min(dur, currentState.localTickStart + dt);
+                const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+                precisePosition = Math.min(dur, currentState.localTickStart + dt);
             }
             precisePosition = Math.floor(Math.max(0, precisePosition));
 
@@ -1164,9 +767,9 @@ export default function App() {
             const newPlaylist = arrayMove(currentPlaylist, oldIndex, newIndex);
 
             setState(prev => ({
-              ...prev,
-              playlist: newPlaylist,
-              playing: wasPlaying
+                ...prev,
+                playlist: newPlaylist,
+                playing: wasPlaying
             }));
 
             const ids = newPlaylist.map(song => song.id);
@@ -1189,8 +792,8 @@ export default function App() {
                         await callJukebox('start');
                     }
                 } else if (wasPlaying) {
-                     await callJukebox('skip', `&index=0&offset=0`);
-                     await callJukebox('start');
+                    await callJukebox('skip', `&index=0&offset=0`);
+                    await callJukebox('start');
                 }
 
                 await new Promise(resolve => setTimeout(resolve, 150));
@@ -1213,8 +816,8 @@ export default function App() {
         return dur ? Math.round((pos / dur) * 1000) : 0;
     }, [state.position, state.currentIndex, state.playlist]);
 
-    const seekFillStyle = useMemo(() => ({'--seek-fill': `${(seekValue / 10).toFixed(1)}%`}), [seekValue]);
-    const volFillStyle = useMemo(() => ({'--vol-fill': `${Math.round(state.gain * 100)}%`}), [state.gain]);
+    const seekFillStyle = useMemo(() => ({ '--seek-fill': `${(seekValue / 10).toFixed(1)}%` }), [seekValue]);
+    const volFillStyle = useMemo(() => ({ '--vol-fill': `${Math.round(state.gain * 100)}%` }), [state.gain]);
 
     const repeatButtonText = useMemo(() => {
         if (state.repeatMode === 'one') return '🔂1';
@@ -1249,30 +852,30 @@ export default function App() {
                 </aside>
 
                 <div className="transport-card">
-                     <div className="status-row">
+                    <div className="status-row">
                         <div id="statusText">{statusText}</div>
                         <div className="small">Up next: <span id="queueCount">{upcomingCount}</span> tracks</div>
                     </div>
                     <div className="controls">
-                      <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
-                      <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
-                        {state.playing ? '⏸' : '▶'}
-                      </button>
-                      <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
-                      <button
-                        className={`btn repeat ${state.repeatMode !== 'off' ? 'active' : ''}`}
-                        title={repeatButtonTitle}
-                        onClick={handleRepeatClick}
-                       >
-                        {repeatButtonText}
-                       </button>
-                      <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
-                      <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
-                      <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
+                        <button className="btn" title="Previous" onClick={() => handleTransport('previous')}>⏮</button>
+                        <button className="btn primary" title="Play / Pause" onClick={() => handleTransport('play-pause')}>
+                            {state.playing ? '⏸' : '▶'}
+                        </button>
+                        <button className="btn" title="Next" onClick={() => handleTransport('next')}>⏭</button>
+                        <button
+                            className={`btn repeat ${state.repeatMode !== 'off' ? 'active' : ''}`}
+                            title={repeatButtonTitle}
+                            onClick={handleRepeatClick}
+                        >
+                            {repeatButtonText}
+                        </button>
+                        <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
+                        <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
+                        <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
                     </div>
 
                     <div className="progress">
-                         <div className="time">{fmtTime(state.position)}</div>
+                        <div className="time">{fmtTime(state.position)}</div>
                         <input
                             className="seek" type="range" min="0" max="1000"
                             value={seekValue} style={seekFillStyle}
@@ -1283,7 +886,7 @@ export default function App() {
                     </div>
 
                     <div className="vol">
-                         <div className="vol-row">
+                        <div className="vol-row">
                             <div title="Volume">🔊</div>
                             <input
                                 id="volume"
@@ -1300,14 +903,14 @@ export default function App() {
 
                 <aside className="side-card">
                     <h3>Up Next <small>(Total: {totalQueueTimeStr})</small></h3>
-                    
-                    <DndContext 
+
+                    <DndContext
                         sensors={sensors}
                         collisionDetection={closestCenter}
                         onDragEnd={handleDragEnd}
                     >
-                        <SortableContext 
-                            items={queueItemIds} 
+                        <SortableContext
+                            items={queueItemIds}
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="queue" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
@@ -1318,9 +921,9 @@ export default function App() {
                                     const displayNum = index - state.currentIndex;
                                     const itemId = `${song.id}-${index}`;
                                     return (
-                                        <JukeboxQueueItem 
-                                            key={itemId} 
-                                            id={itemId}  
+                                        <JukeboxQueueItem
+                                            key={itemId}
+                                            id={itemId}
                                             song={song}
                                             index={index}
                                             displayNum={displayNum}
@@ -1332,8 +935,8 @@ export default function App() {
                             </div>
                         </SortableContext>
                     </DndContext>
-                    
-                     <div className="search-box">
+
+                    <div className="search-box">
                         <input
                             placeholder="Search songs to add…"
                             value={searchQuery}
@@ -1343,12 +946,12 @@ export default function App() {
                         <div className="search-results" hidden={searchResults.length === 0}>
                             {searchResults.map((song) => (
                                 <div key={song.id} className="srow" onClick={() => addSongFromSearch(song.id)}>
-                                    <img src={coverArtUrl(song.coverArt, 80)} alt="Cover" onError={(e) => e.target.style.visibility='hidden'}/>
+                                    <img src={coverArtUrl(song.coverArt, 80)} alt="Cover" onError={(e) => e.target.style.visibility = 'hidden'} />
                                     <div className="s-meta">
-                                        <div className="qi-title">{escapeHtml(song.title || 'Unknown')}</div>
-                                        <div className="s-artist">{escapeHtml(song.artist || '')} • {escapeHtml(song.album || '')}</div>
+                                        <div className="qi-title">{song.title || 'Unknown'}</div>
+                                        <div className="s-artist">{song.artist || ''} • {song.album || ''}</div>
                                     </div>
-                                    <div style={{textAlign: 'right'}}>➕</div>
+                                    <div style={{ textAlign: 'right' }}>➕</div>
                                 </div>
                             ))}
                         </div>
@@ -1356,9 +959,9 @@ export default function App() {
 
                     <div className="config">
                         <div className="row">
-                            <input id="serverUrl" placeholder="Server URL" value={configForm.serverUrl || ''} onChange={handleConfigChange} disabled={isAuthenticated}/>
+                            <input id="serverUrl" placeholder="Server URL" value={configForm.serverUrl || ''} onChange={handleConfigChange} disabled={isAuthenticated} />
                             <input id="username" placeholder="Username" value={configForm.username || ''} onChange={handleConfigChange} disabled={isAuthenticated} />
-                            <input id="password" placeholder="Password" type="password" value={configForm.password || ''} onChange={handleConfigChange} onKeyPress={(e) => e.key === 'Enter' && handleLogin()} disabled={isAuthenticated}/>
+                            <input id="password" placeholder="Password" type="password" value={configForm.password || ''} onChange={handleConfigChange} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={isAuthenticated} />
                             <button onClick={handleLogin} disabled={isAuthenticated}>
                                 {isAuthenticated ? '✓ Logged In' : 'Login'}
                             </button>

@@ -296,17 +296,29 @@ npm run preview
 ### Project Structure
 
 ```
-navidrome-jukebox-web/
+kneep/
+├── public/                  # Static assets (images, icons)
+│   ├── play.png
+│   └── winamp.jpg
 ├── src/
+│   ├── api/
+│   │   └── subsonic.js      # Navidrome/Subsonic API client
+│   ├── components/
+│   │   └── QueueItem.jsx    # Sortable queue item component
+│   ├── utils/
+│   │   ├── helpers.js       # Time formatting utilities
+│   │   ├── md5.js           # MD5 hash for Subsonic auth
+│   │   └── playbackManager.js # Playback state persistence
 │   ├── App.jsx              # Main application component
 │   ├── App.css              # Styles
-│   ├── jukeboxApi.js        # Navidrome API client
 │   └── main.jsx             # Entry point
-├── dist/                    # Production build output
 ├── docker-compose.yml       # Docker services configuration
 ├── Dockerfile               # Custom Navidrome image with MPV
+├── Jenkinsfile              # CI/CD pipeline
 ├── nginx.default.conf       # Nginx proxy configuration
-├── navidrome.toml          # Navidrome server configuration
+├── navidrome.toml           # Navidrome server configuration
+├── rebuild.sh               # Production rebuild script
+├── vite.config.js           # Vite build configuration
 └── package.json             # Dependencies and scripts
 ```
 

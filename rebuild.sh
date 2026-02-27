@@ -13,14 +13,14 @@ rm -rf node_modules dist
 echo ">>> Installing dependencies..."
 npm install
 
-echo ">>> Auditing and fixing packages..."
+echo ">>> Auditing packages..."
 npm audit fix || true   # allow audit to fail without aborting
 
 echo ">>> Building frontend..."
 npm run build
 
 echo ">>> Stopping and removing existing containers..."
-docker compose -p "$PROJECT_NAME" down -v
+docker compose -p "$PROJECT_NAME" down
 
 echo ">>> Rebuilding Docker images..."
 docker compose build --no-cache

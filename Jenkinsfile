@@ -31,18 +31,8 @@ pipeline {
                             git checkout ${DEPLOY_BRANCH}
                             git pull origin ${DEPLOY_BRANCH}
 
-                            echo 'Cleaning and Installing Dependencies...'
-                            rm -rf node_modules dist
-                            npm install
-                            npm audit fix --force
-
-                            echo 'Building Project...'
-                            npm run build
-
-                            echo 'Restarting Docker Containers...'
-                            docker compose down -v
-                            docker compose build --no-cache
-                            docker compose -p kneep up -d
+                            echo 'Running rebuild script...'
+                            bash rebuild.sh
 
                             echo 'Deployment Finished Successfully!'
                         "
