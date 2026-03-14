@@ -26,10 +26,12 @@ pipeline {
                             echo 'Navigating to project directory...'
                             cd ${DEPLOY_PATH}
 
-                            echo 'Pulling changes for branch ${DEPLOY_BRANCH}...'
-                            # Ensure we are on the correct branch
+                            echo 'Resetting local changes and pulling branch ${DEPLOY_BRANCH}...'
+                            # Ensure we are on the correct branch and in a clean state
+                            git fetch origin ${DEPLOY_BRANCH}
                             git checkout ${DEPLOY_BRANCH}
-                            git pull origin ${DEPLOY_BRANCH}
+                            git reset --hard origin/${DEPLOY_BRANCH}
+                            git clean -fd
 
                             echo 'Running rebuild script...'
                             bash rebuild.sh
