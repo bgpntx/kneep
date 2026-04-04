@@ -5,7 +5,7 @@ pipeline {
         DEPLOY_HOST   = "${env.PROD_IP_KNEEP}"
         DEPLOY_PORT   = "${env.PROD_PORT_KNEEP}"
         DEPLOY_USER   = "${env.PROD_USER_KNEEP}"
-        DEPLOY_PATH   = "${env.DEPLOY_PATH_KNEEP}"
+        DEPLOY_PATH   = "/home/bug/git/media/kneep"
         DEPLOY_BRANCH = "${env.DEPLOY_BRANCH_KNEEP}"
         // This pulls the secret text credential named 'discord_bug' into the env variable
         DISCORD_URL   = credentials('discord_bug')
