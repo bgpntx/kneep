@@ -11,7 +11,7 @@ services:
       TZ: Europe/Kyiv
       ND_MUSICFOLDER: /music
       ND_DATAFOLDER: /data
-      ND_LOGLEVEL: debug
+      ND_LOGLEVEL: info
       ND_JUKEBOX_ENABLED: "true"
       ND_JUKEBOX_ADMINONLY: "false"
       ND_MPV_CMD_TEMPLATE: "mpv --no-video --audio-device='alsa/sysdefault:CARD=U24XL' --input-ipc-server=%s %f"
