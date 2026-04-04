@@ -1,6 +1,6 @@
 services:
   navidrome:
-    env_file: .env
+    env_file: ../.env
     build:
       context: .
       dockerfile: Dockerfile
