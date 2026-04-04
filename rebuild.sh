@@ -21,6 +21,7 @@ npm run build
 
 echo ">>> Stopping and removing existing containers..."
 docker compose -p "$PROJECT_NAME" down
+docker rm -f navidrome jukebox-web 2>/dev/null || true
 
 echo ">>> Rebuilding Docker images..."
 docker compose build --no-cache
