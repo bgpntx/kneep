@@ -33,6 +33,9 @@ import {
 import { fmtTime, formatDuration } from './utils/helpers.js';
 import { PlaybackStateManager } from './utils/playbackManager.js';
 import { JukeboxQueueItem } from './components/QueueItem.jsx';
+import { getTopArtists } from './api/lastfm.js';
+import { generateAiPlaylist } from './api/aiPlaylist.js';
+import { searchSongsByArtist } from './api/subsonic.js';
 
 const initialState = {
     playlist: [],
@@ -56,6 +59,7 @@ export default function App() {
     const [configForm, setConfigForm] = useState({ serverUrl: '', username: '', password: '' });
     const [searchResults, setSearchResults] = useState([]);
     const [scrobbledIds, setScrobbledIds] = useState(new Set());
+    const [aiGenerating, setAiGenerating] = useState(false);
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
@@ -725,6 +729,81 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
+    const handleAiPlaylist = useCallback(async () => {
+        const lastfmApiKey = __LASTFM_API_KEY__;
+        const lastfmUsername = __LASTFM_USERNAME__;
+        const anthropicApiKey = __ANTHROPIC_API_KEY__;
+
+        if (!lastfmApiKey || !lastfmUsername || !anthropicApiKey) {
+            setStatusText('AI config missing — set VITE_LASTFM_API_KEY, VITE_LASTFM_USERNAME, VITE_ANTHROPIC_API_KEY in .env');
+            return;
+        }
+
+        setAiGenerating(true);
+        try {
+            // Step 1: Fetch top artists from Last.fm
+            setStatusText('🤖 Fetching Last.fm library…');
+            const artists = await getTopArtists(lastfmUsername, lastfmApiKey, 500);
+            if (artists.length === 0) {
+                setStatusText('No artists with 500+ scrobbles found');
+                setAiGenerating(false);
+                return;
+            }
+            if (DEBUG()) console.log(`AI: Found ${artists.length} artists with 500+ scrobbles`);
+
+            // Step 2: Search Navidrome for tracks by those artists (batched)
+            setStatusText(`🤖 Scanning library (${artists.length} artists)…`);
+            const catalog = {};
+            const batchSize = 5;
+            for (let i = 0; i < artists.length; i += batchSize) {
+                const batch = artists.slice(i, i + batchSize);
+                const results = await Promise.all(
+                    batch.map(a => searchSongsByArtist(a.name).catch(() => []))
+                );
+                batch.forEach((a, idx) => {
+                    if (results[idx].length > 0) {
+                        catalog[a.name] = results[idx].map(s => ({
+                            id: s.id, title: s.title, album: s.album, duration: s.duration,
+                        }));
+                    }
+                });
+            }
+
+            const totalTracks = Object.values(catalog).reduce((sum, t) => sum + t.length, 0);
+            if (totalTracks === 0) {
+                setStatusText('No matching tracks found in Navidrome');
+                setAiGenerating(false);
+                return;
+            }
+            if (DEBUG()) console.log(`AI: Catalog has ${totalTracks} tracks from ${Object.keys(catalog).length} artists`);
+
+            // Step 3: Generate AI playlist
+            setStatusText('🤖 AI is curating your playlist…');
+            const tracks = await generateAiPlaylist(catalog, anthropicApiKey);
+            if (DEBUG()) console.log(`AI: Generated playlist with ${tracks.length} tracks`);
+
+            // Step 4: Add tracks to jukebox queue (batched)
+            setStatusText(`🤖 Adding ${tracks.length} tracks…`);
+            const addBatchSize = 10;
+            for (let i = 0; i < tracks.length; i += addBatchSize) {
+                const batch = tracks.slice(i, i + addBatchSize);
+                await Promise.all(
+                    batch.map(t => callJukebox('add', `&id=${encodeURIComponent(t.id)}`).catch(e => {
+                        if (DEBUG()) console.warn(`Failed to add track ${t.id}:`, e);
+                    }))
+                );
+            }
+
+            await refreshState(true);
+            setStatusText(`🤖 Added ${tracks.length} AI tracks to queue`);
+        } catch (e) {
+            setStatusText(`AI error: ${e.message}`);
+            console.error('AI playlist error:', e);
+        } finally {
+            setAiGenerating(false);
+        }
+    }, [refreshState]);
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -870,6 +949,7 @@ export default function App() {
                         </button>
                         <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
                         <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
+                        <button className={`btn ai ${aiGenerating ? 'active' : ''}`} title="AI Playlist" onClick={handleAiPlaylist} disabled={!isAuthenticated || aiGenerating}>{aiGenerating ? '⏳' : '🤖'}</button>
                         <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
                     </div>
 

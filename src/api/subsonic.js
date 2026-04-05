@@ -114,6 +114,21 @@ export async function searchSongs(query) {
     return data?.['subsonic-response']?.searchResult3?.song || [];
 }
 
+export async function searchSongsByArtist(artistName, count = 200) {
+    if (!isSessionValid()) throw new Error('Not authenticated');
+    const url = `${config.serverUrl}/rest/search3?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&query=${encodeURIComponent(artistName)}&songCount=${count}&artistCount=0&albumCount=0`;
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
+    const data = await res.json();
+    const songs = data?.['subsonic-response']?.searchResult3?.song || [];
+    // Post-filter: only keep songs where artist matches (case-insensitive)
+    const normalizedQuery = artistName.toLowerCase().replace(/^the\s+/, '');
+    return songs.filter(s => {
+        const normalizedArtist = (s.artist || '').toLowerCase().replace(/^the\s+/, '');
+        return normalizedArtist === normalizedQuery || normalizedArtist.includes(normalizedQuery) || normalizedQuery.includes(normalizedArtist);
+    });
+}
+
 export async function scrobble(id, submission = false) {
     if (!isSessionValid() || !id) {
         if (DEBUG()) console.log('Scrobble skipped: not authenticated or missing song ID.');
