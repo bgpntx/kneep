@@ -98,6 +98,17 @@ export async function getRandomSongFromServer() {
     return song;
 }
 
+export async function getRandomSongs(count = 100) {
+    if (!isSessionValid()) throw new Error('Not authenticated');
+    const url = `${config.serverUrl}/rest/getRandomSongs?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&size=${count}`;
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
+    const data = await res.json();
+    const resp = data?.['subsonic-response'];
+    if (resp?.status !== 'ok') throw new Error(`API failed: ${resp?.error?.message || 'Unknown error'}`);
+    return Array.isArray(resp.randomSongs?.song) ? resp.randomSongs.song : resp.randomSongs?.song ? [resp.randomSongs.song] : [];
+}
+
 export async function addRandomSong() {
     const randomSong = await getRandomSongFromServer();
     const resp = await callJukebox('add', `&id=${encodeURIComponent(randomSong.id)}`);

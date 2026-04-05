@@ -32,6 +32,7 @@ import {
     getAiConfig,
     setAiConfig,
     searchSongsByArtist,
+    getRandomSongs,
 } from './api/subsonic.js';
 import { fmtTime, formatDuration } from './utils/helpers.js';
 import { PlaybackStateManager } from './utils/playbackManager.js';
@@ -751,18 +752,16 @@ export default function App() {
             }
             if (DEBUG()) console.log(`AI: Found ${artists.length} artists with 500+ scrobbles`);
 
-            // Step 2: Search Navidrome for tracks by those artists
+            // Step 2: Search Navidrome for tracks by those artists (sequential)
             const allTracks = [];
-            const batchSize = 5;
-            for (let i = 0; i < artists.length; i += batchSize) {
-                const batch = artists.slice(i, i + batchSize);
-                const results = await Promise.all(
-                    batch.map(a => searchSongsByArtist(a.name).catch(() => []))
-                );
-                for (const songs of results) {
+            for (let i = 0; i < artists.length; i++) {
+                try {
+                    const songs = await searchSongsByArtist(artists[i].name);
                     for (const s of songs) allTracks.push(s);
+                } catch (e) {
+                    if (DEBUG()) console.warn(`Search failed for "${artists[i].name}":`, e.message);
                 }
-                setStatusText(`🤖 Scanning library (${Math.min(i + batchSize, artists.length)}/${artists.length})…`);
+                if (i % 10 === 9) setStatusText(`🤖 Scanning library (${i + 1}/${artists.length}, ${allTracks.length} tracks)…`);
             }
 
             if (allTracks.length === 0) {
@@ -772,12 +771,22 @@ export default function App() {
             }
             if (DEBUG()) console.log(`AI: Found ${allTracks.length} tracks from ${artists.length} artists`);
 
-            // Step 3: Shuffle and pick 100 random tracks
+            // Step 3: Shuffle and pick up to 100 tracks
             for (let i = allTracks.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [allTracks[i], allTracks[j]] = [allTracks[j], allTracks[i]];
             }
-            const selected = allTracks.slice(0, 100);
+            let selected = allTracks.slice(0, 100);
+
+            // Fill remaining slots with random songs from Navidrome
+            if (selected.length < 100) {
+                setStatusText(`🤖 Found ${selected.length} from Last.fm, filling with random…`);
+                const usedIds = new Set(selected.map(s => s.id));
+                const randoms = await getRandomSongs(200);
+                const fill = randoms.filter(s => !usedIds.has(s.id)).slice(0, 100 - selected.length);
+                selected = [...selected, ...fill];
+                if (DEBUG()) console.log(`AI: Filled ${fill.length} random tracks, total ${selected.length}`);
+            }
 
             // Step 4: Add tracks to jukebox queue (batched)
             setStatusText(`🤖 Adding ${selected.length} tracks…`);
