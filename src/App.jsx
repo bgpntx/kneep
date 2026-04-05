@@ -751,16 +751,18 @@ export default function App() {
             }
             if (DEBUG()) console.log(`AI: Found ${artists.length} artists with 500+ scrobbles`);
 
-            // Step 2: Search Navidrome for tracks by those artists (sequential to avoid rate limit)
+            // Step 2: Search Navidrome for tracks by those artists
             const allTracks = [];
-            for (let i = 0; i < artists.length; i++) {
-                try {
-                    const songs = await searchSongsByArtist(artists[i].name);
-                    for (const s of songs) {
-                        allTracks.push(s);
-                    }
-                } catch (_) { /* skip failed artist */ }
-                if (i % 5 === 4) setStatusText(`🤖 Scanning library (${i + 1}/${artists.length})…`);
+            const batchSize = 5;
+            for (let i = 0; i < artists.length; i += batchSize) {
+                const batch = artists.slice(i, i + batchSize);
+                const results = await Promise.all(
+                    batch.map(a => searchSongsByArtist(a.name).catch(() => []))
+                );
+                for (const songs of results) {
+                    for (const s of songs) allTracks.push(s);
+                }
+                setStatusText(`🤖 Scanning library (${Math.min(i + batchSize, artists.length)}/${artists.length})…`);
             }
 
             if (allTracks.length === 0) {
@@ -777,17 +779,17 @@ export default function App() {
             }
             const selected = allTracks.slice(0, 100);
 
-            // Step 4: Add tracks to jukebox queue (sequential to avoid rate limit)
+            // Step 4: Add tracks to jukebox queue (batched)
             setStatusText(`🤖 Adding ${selected.length} tracks…`);
             let added = 0;
-            for (let i = 0; i < selected.length; i++) {
-                try {
-                    await callJukebox('add', `&id=${encodeURIComponent(selected[i].id)}`);
-                    added++;
-                } catch (e) {
-                    if (DEBUG()) console.warn(`Failed to add track ${selected[i].id}:`, e);
-                }
-                if (i % 10 === 9) setStatusText(`🤖 Adding tracks (${i + 1}/${selected.length})…`);
+            const addBatch = 10;
+            for (let i = 0; i < selected.length; i += addBatch) {
+                const batch = selected.slice(i, i + addBatch);
+                const results = await Promise.all(
+                    batch.map(t => callJukebox('add', `&id=${encodeURIComponent(t.id)}`).then(() => true).catch(() => false))
+                );
+                added += results.filter(Boolean).length;
+                setStatusText(`🤖 Adding tracks (${Math.min(i + addBatch, selected.length)}/${selected.length})…`);
             }
 
             await refreshState(true);
