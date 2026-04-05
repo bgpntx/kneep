@@ -17,6 +17,7 @@ A retro-styled web interface for controlling [Navidrome](https://www.navidrome.o
 - **Drag & Drop Queue** — Reorder your playlist with drag and drop
 - **Library Search** — Real-time search, click to add
 - **Random Song** — Add random tracks with one click
+- **🤖 AI Playlist** — Generate 100-track queue from your Last.fm top artists (500+ scrobbles)
 - **Last.fm Scrobbling** — Automatic scrobble with tab-hidden catch-up
 - **Album Art** — High-quality cover art display
 - **Media Session API** — Control from OS media keys / lock screen
@@ -74,7 +75,7 @@ npm install
 npm run dev       # http://localhost:5173
 ```
 
-The dev server proxies `/rest/*` API calls to `localhost:4533` (configurable in `vite.config.js`).
+The dev server proxies `/rest/*` to `localhost:4533`, `/lastfm/*` to Last.fm API, and `/anthropic/*` to Anthropic API (configurable in `vite.config.js`).
 
 ## Project Structure
 
@@ -83,7 +84,8 @@ kneep/
 ├── public/                    # Static assets
 ├── src/
 │   ├── api/
-│   │   └── subsonic.js        # Subsonic API client (auth, jukebox, scrobble)
+│   │   ├── subsonic.js        # Subsonic API client (auth, jukebox, scrobble)
+│   │   └── lastfm.js          # Last.fm API client (top artists)
 │   ├── components/
 │   │   └── QueueItem.jsx      # Drag & drop queue item
 │   ├── utils/
@@ -128,9 +130,18 @@ kneep/
 ### Environment Variables (`.env`)
 
 ```bash
-LASTFM_API_KEY=your_key    # Last.fm API key (optional)
-LASTFM_SECRET=your_secret  # Last.fm secret (optional)
+LASTFM_API_KEY=your_key    # Last.fm API key (for Navidrome scrobbling)
+LASTFM_SECRET=your_secret  # Last.fm secret (for Navidrome scrobbling)
 ```
+
+### AI Playlist Setup
+
+The 🤖 button generates a 100-track queue from your Last.fm listening history. Configuration is done in the browser UI (stored in localStorage):
+
+1. **Last.fm Username** — your Last.fm profile name
+2. **Last.fm API Key** — get one at [last.fm/api](https://www.last.fm/api/account/create)
+
+The feature fetches your top artists with 500+ scrobbles, finds their tracks in Navidrome, and randomly picks 100 to add to the queue.
 
 ### Navidrome (`navidrome.toml`)
 

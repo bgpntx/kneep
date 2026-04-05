@@ -7,7 +7,9 @@
 
 ```
 src/
-  api/subsonic.js          — Subsonic API клієнт (auth, jukebox control, scrobble)
+  api/subsonic.js          — Subsonic API клієнт (auth, jukebox control, scrobble, AI config)
+  api/lastfm.js            — Last.fm API клієнт (top artists)
+  api/aiPlaylist.js         — AI playlist генерація (Claude API, не використовується поки)
   components/QueueItem.jsx — Drag & drop елемент черги
   utils/md5.js             — MD5 хеш для автентифікації
   utils/helpers.js         — Форматування часу
@@ -36,9 +38,18 @@ bash rebuild.sh   # або через Jenkins
 ```
 Jenkinsfile підключається по SSH і запускає `rebuild.sh`.
 
+## AI Playlist (кнопка 🤖)
+Генерує Up Next із 100 рандомних треків на основі Last.fm бібліотеки:
+1. Отримує топ виконавців з Last.fm (500+ скроблів)
+2. Шукає їх треки в Navidrome
+3. Рандомно обирає 100 та додає в чергу
+
+Налаштування (Last.fm Username + API Key) — через UI в браузері, зберігаються в localStorage.
+Nginx проксює `/lastfm/` → `ws.audioscrobbler.com`.
+
 ## Конфігурація
 - `navidrome.toml` — налаштування Navidrome сервера
 - `docker-compose.yml` — Docker-сервіси
-- `nginx.default.conf` — HTTPS proxy
+- `nginx.default.conf` — HTTPS proxy, проксі для Last.fm API
 - `.env` — секрети Last.fm (див `.env.example`)
 
