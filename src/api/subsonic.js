@@ -7,7 +7,7 @@ import { md5 } from '../utils/md5.js';
 export const API_VERSION = '1.16.1';
 const CACHE_VERSION = 'v2'; // Increment this to invalidate old cache
 
-export const DEBUG = () => typeof window !== 'undefined' && window.JUKEBOX_DEBUG === true;
+export const DEBUG = () => import.meta.env.DEV;
 
 // Cache key helpers with versioning
 export const cacheKey = (key) => `jukebox_${CACHE_VERSION}_${key}`;

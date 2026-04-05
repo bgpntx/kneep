@@ -5,7 +5,7 @@ pipeline {
         DEPLOY_HOST   = "${env.PROD_IP_KNEEP}"
         DEPLOY_PORT   = "${env.PROD_PORT_KNEEP}"
         DEPLOY_USER   = "${env.PROD_USER_KNEEP}"
-        DEPLOY_PATH   = "${env.DEPLOY_PATH_KNEEP}"
+        DEPLOY_PATH   = "/home/bug/git/media/kneep"
         DEPLOY_BRANCH = "${env.DEPLOY_BRANCH_KNEEP}"
         // This pulls the secret text credential named 'discord_bug' into the env variable
         DISCORD_URL   = credentials('discord_bug')
@@ -26,10 +26,12 @@ pipeline {
                             echo 'Navigating to project directory...'
                             cd ${DEPLOY_PATH}
 
-                            echo 'Pulling changes for branch ${DEPLOY_BRANCH}...'
-                            # Ensure we are on the correct branch
+                            echo 'Resetting local changes and pulling branch ${DEPLOY_BRANCH}...'
+                            # Ensure we are on the correct branch and in a clean state
+                            git fetch origin ${DEPLOY_BRANCH}
                             git checkout ${DEPLOY_BRANCH}
-                            git pull origin ${DEPLOY_BRANCH}
+                            git reset --hard origin/${DEPLOY_BRANCH}
+                            git clean -fd
 
                             echo 'Running rebuild script...'
                             bash rebuild.sh
