@@ -41,3 +41,4 @@ Jenkinsfile підключається по SSH і запускає `rebuild.sh`
 - `docker-compose.yml` — Docker-сервіси
 - `nginx.default.conf` — HTTPS proxy
 - `.env` — секрети Last.fm (див `.env.example`)
+

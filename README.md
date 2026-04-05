@@ -6,6 +6,10 @@ A retro-styled web interface for controlling [Navidrome](https://www.navidrome.o
 ![React](https://img.shields.io/badge/React-18.2-61dafb.svg)
 ![Vite](https://img.shields.io/badge/Vite-5.2-646cff.svg)
 
+## Screenshot
+
+![Kneep player — Now Playing and queue](docs/player.png)
+
 ## Features
 
 - ~~**🎨 Modern UI** — Beautiful glassmorphic design with smooth animations~~ Old classic Winamp style 😜
