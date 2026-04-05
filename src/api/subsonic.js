@@ -148,6 +148,18 @@ export async function scrobble(id, submission = false) {
 
 export function getConfig() { return { serverUrl: config.serverUrl, username: config.username }; }
 
+// AI config stored in localStorage
+export function getAiConfig() {
+    return JSON.parse(localStorage.getItem(cacheKey('ai_config'))) || { lastfmApiKey: '', lastfmUsername: '', anthropicApiKey: '' };
+}
+
+export function setAiConfig(fields) {
+    const current = getAiConfig();
+    const updated = { ...current, ...fields };
+    localStorage.setItem(cacheKey('ai_config'), JSON.stringify(updated));
+    return updated;
+}
+
 export async function authenticate(serverUrl, username, password) {
     if (!username || !password) throw new Error('Username and password are required');
     serverUrl = serverUrl || '';

@@ -29,13 +29,15 @@ import {
     reconnect,
     isSessionValid,
     clearSession,
+    getAiConfig,
+    setAiConfig,
+    searchSongsByArtist,
 } from './api/subsonic.js';
 import { fmtTime, formatDuration } from './utils/helpers.js';
 import { PlaybackStateManager } from './utils/playbackManager.js';
 import { JukeboxQueueItem } from './components/QueueItem.jsx';
 import { getTopArtists } from './api/lastfm.js';
 import { generateAiPlaylist } from './api/aiPlaylist.js';
-import { searchSongsByArtist } from './api/subsonic.js';
 
 const initialState = {
     playlist: [],
@@ -60,6 +62,7 @@ export default function App() {
     const [searchResults, setSearchResults] = useState([]);
     const [scrobbledIds, setScrobbledIds] = useState(new Set());
     const [aiGenerating, setAiGenerating] = useState(false);
+    const [aiConfigForm, setAiConfigForm] = useState(() => getAiConfig());
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
@@ -730,12 +733,10 @@ export default function App() {
     }, [configForm, refreshState, handleTransport]);
 
     const handleAiPlaylist = useCallback(async () => {
-        const lastfmApiKey = __LASTFM_API_KEY__;
-        const lastfmUsername = __LASTFM_USERNAME__;
-        const anthropicApiKey = __ANTHROPIC_API_KEY__;
+        const { lastfmApiKey, lastfmUsername, anthropicApiKey } = getAiConfig();
 
         if (!lastfmApiKey || !lastfmUsername || !anthropicApiKey) {
-            setStatusText('AI config missing — set LASTFM_API_KEY, LASTFM_USERNAME, ANTHROPIC_API_KEY in .env');
+            setStatusText('AI config missing — fill in Last.fm & Anthropic settings below');
             return;
         }
 
@@ -1049,6 +1050,14 @@ export default function App() {
                             {isAuthenticated
                                 ? '✓ Connected. Played tracks auto-removed.'
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
+                        </div>
+                    </div>
+                    <div className="config ai-config">
+                        <div className="small" style={{ marginBottom: 4 }}>🤖 AI Playlist</div>
+                        <div className="row">
+                            <input placeholder="Last.fm Username" value={aiConfigForm.lastfmUsername || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, lastfmUsername: v }; setAiConfig(u); return u; }); }} />
+                            <input placeholder="Last.fm API Key" type="password" value={aiConfigForm.lastfmApiKey || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, lastfmApiKey: v }; setAiConfig(u); return u; }); }} />
+                            <input placeholder="Anthropic API Key" type="password" value={aiConfigForm.anthropicApiKey || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, anthropicApiKey: v }; setAiConfig(u); return u; }); }} />
                         </div>
                     </div>
                 </aside>
