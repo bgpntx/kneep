@@ -735,7 +735,7 @@ export default function App() {
         const anthropicApiKey = __ANTHROPIC_API_KEY__;
 
         if (!lastfmApiKey || !lastfmUsername || !anthropicApiKey) {
-            setStatusText('AI config missing — set VITE_LASTFM_API_KEY, VITE_LASTFM_USERNAME, VITE_ANTHROPIC_API_KEY in .env');
+            setStatusText('AI config missing — set LASTFM_API_KEY, LASTFM_USERNAME, ANTHROPIC_API_KEY in .env');
             return;
         }
 
