@@ -37,7 +37,6 @@ import { fmtTime, formatDuration } from './utils/helpers.js';
 import { PlaybackStateManager } from './utils/playbackManager.js';
 import { JukeboxQueueItem } from './components/QueueItem.jsx';
 import { getTopArtists } from './api/lastfm.js';
-import { generateAiPlaylist } from './api/aiPlaylist.js';
 
 const initialState = {
     playlist: [],
@@ -733,10 +732,10 @@ export default function App() {
     }, [configForm, refreshState, handleTransport]);
 
     const handleAiPlaylist = useCallback(async () => {
-        const { lastfmApiKey, lastfmUsername, anthropicApiKey } = getAiConfig();
+        const { lastfmApiKey, lastfmUsername } = getAiConfig();
 
-        if (!lastfmApiKey || !lastfmUsername || !anthropicApiKey) {
-            setStatusText('AI config missing — fill in Last.fm & Anthropic settings below');
+        if (!lastfmApiKey || !lastfmUsername) {
+            setStatusText('AI config missing — fill in Last.fm settings below');
             return;
         }
 
@@ -753,46 +752,46 @@ export default function App() {
             if (DEBUG()) console.log(`AI: Found ${artists.length} artists with 500+ scrobbles`);
 
             // Step 2: Search Navidrome for tracks by those artists (sequential to avoid rate limit)
-            setStatusText(`🤖 Scanning library (${artists.length} artists)…`);
-            const catalog = {};
+            const allTracks = [];
             for (let i = 0; i < artists.length; i++) {
                 try {
                     const songs = await searchSongsByArtist(artists[i].name);
-                    if (songs.length > 0) {
-                        catalog[artists[i].name] = songs.map(s => ({
-                            id: s.id, title: s.title, album: s.album, duration: s.duration,
-                        }));
+                    for (const s of songs) {
+                        allTracks.push(s);
                     }
                 } catch (_) { /* skip failed artist */ }
                 if (i % 5 === 4) setStatusText(`🤖 Scanning library (${i + 1}/${artists.length})…`);
             }
 
-            const totalTracks = Object.values(catalog).reduce((sum, t) => sum + t.length, 0);
-            if (totalTracks === 0) {
+            if (allTracks.length === 0) {
                 setStatusText('No matching tracks found in Navidrome');
                 setAiGenerating(false);
                 return;
             }
-            if (DEBUG()) console.log(`AI: Catalog has ${totalTracks} tracks from ${Object.keys(catalog).length} artists`);
+            if (DEBUG()) console.log(`AI: Found ${allTracks.length} tracks from ${artists.length} artists`);
 
-            // Step 3: Generate AI playlist
-            setStatusText('🤖 AI is curating your playlist…');
-            const tracks = await generateAiPlaylist(catalog, anthropicApiKey);
-            if (DEBUG()) console.log(`AI: Generated playlist with ${tracks.length} tracks`);
+            // Step 3: Shuffle and pick 100 random tracks
+            for (let i = allTracks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allTracks[i], allTracks[j]] = [allTracks[j], allTracks[i]];
+            }
+            const selected = allTracks.slice(0, 100);
 
             // Step 4: Add tracks to jukebox queue (sequential to avoid rate limit)
-            setStatusText(`🤖 Adding ${tracks.length} tracks…`);
-            for (let i = 0; i < tracks.length; i++) {
+            setStatusText(`🤖 Adding ${selected.length} tracks…`);
+            let added = 0;
+            for (let i = 0; i < selected.length; i++) {
                 try {
-                    await callJukebox('add', `&id=${encodeURIComponent(tracks[i].id)}`);
+                    await callJukebox('add', `&id=${encodeURIComponent(selected[i].id)}`);
+                    added++;
                 } catch (e) {
-                    if (DEBUG()) console.warn(`Failed to add track ${tracks[i].id}:`, e);
+                    if (DEBUG()) console.warn(`Failed to add track ${selected[i].id}:`, e);
                 }
-                if (i % 10 === 9) setStatusText(`🤖 Adding tracks (${i + 1}/${tracks.length})…`);
+                if (i % 10 === 9) setStatusText(`🤖 Adding tracks (${i + 1}/${selected.length})…`);
             }
 
             await refreshState(true);
-            setStatusText(`🤖 Added ${tracks.length} AI tracks to queue`);
+            setStatusText(`🤖 Added ${added} tracks to queue`);
         } catch (e) {
             setStatusText(`AI error: ${e.message}`);
             console.error('AI playlist error:', e, e.stack);
@@ -1053,7 +1052,6 @@ export default function App() {
                         <div className="row">
                             <input placeholder="Last.fm Username" value={aiConfigForm.lastfmUsername || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, lastfmUsername: v }; setAiConfig(u); return u; }); }} />
                             <input placeholder="Last.fm API Key" type="password" value={aiConfigForm.lastfmApiKey || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, lastfmApiKey: v }; setAiConfig(u); return u; }); }} />
-                            <input placeholder="Anthropic API Key" type="password" value={aiConfigForm.anthropicApiKey || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, anthropicApiKey: v }; setAiConfig(u); return u; }); }} />
                         </div>
                     </div>
                 </aside>
