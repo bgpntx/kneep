@@ -13,7 +13,8 @@
       "Bash(export PATH=\"/Users/bug/.nvm/versions/node/v20.12.2/bin:$PATH\")",
       "Bash(find /Users/bug/git/kneep -name .env -not -path */node_modules/* -not -path */dist/*)",
       "Read(//Users/bug/git/**)",
-      "Read(//Users/bug/**)"
+      "Read(//Users/bug/**)",
+      "Bash(ssh localnest:*)"
     ]
   }
 }

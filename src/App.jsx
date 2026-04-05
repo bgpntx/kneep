@@ -752,22 +752,19 @@ export default function App() {
             }
             if (DEBUG()) console.log(`AI: Found ${artists.length} artists with 500+ scrobbles`);
 
-            // Step 2: Search Navidrome for tracks by those artists (batched)
+            // Step 2: Search Navidrome for tracks by those artists (sequential to avoid rate limit)
             setStatusText(`🤖 Scanning library (${artists.length} artists)…`);
             const catalog = {};
-            const batchSize = 5;
-            for (let i = 0; i < artists.length; i += batchSize) {
-                const batch = artists.slice(i, i + batchSize);
-                const results = await Promise.all(
-                    batch.map(a => searchSongsByArtist(a.name).catch(() => []))
-                );
-                batch.forEach((a, idx) => {
-                    if (results[idx].length > 0) {
-                        catalog[a.name] = results[idx].map(s => ({
+            for (let i = 0; i < artists.length; i++) {
+                try {
+                    const songs = await searchSongsByArtist(artists[i].name);
+                    if (songs.length > 0) {
+                        catalog[artists[i].name] = songs.map(s => ({
                             id: s.id, title: s.title, album: s.album, duration: s.duration,
                         }));
                     }
-                });
+                } catch (_) { /* skip failed artist */ }
+                if (i % 5 === 4) setStatusText(`🤖 Scanning library (${i + 1}/${artists.length})…`);
             }
 
             const totalTracks = Object.values(catalog).reduce((sum, t) => sum + t.length, 0);
@@ -783,23 +780,22 @@ export default function App() {
             const tracks = await generateAiPlaylist(catalog, anthropicApiKey);
             if (DEBUG()) console.log(`AI: Generated playlist with ${tracks.length} tracks`);
 
-            // Step 4: Add tracks to jukebox queue (batched)
+            // Step 4: Add tracks to jukebox queue (sequential to avoid rate limit)
             setStatusText(`🤖 Adding ${tracks.length} tracks…`);
-            const addBatchSize = 10;
-            for (let i = 0; i < tracks.length; i += addBatchSize) {
-                const batch = tracks.slice(i, i + addBatchSize);
-                await Promise.all(
-                    batch.map(t => callJukebox('add', `&id=${encodeURIComponent(t.id)}`).catch(e => {
-                        if (DEBUG()) console.warn(`Failed to add track ${t.id}:`, e);
-                    }))
-                );
+            for (let i = 0; i < tracks.length; i++) {
+                try {
+                    await callJukebox('add', `&id=${encodeURIComponent(tracks[i].id)}`);
+                } catch (e) {
+                    if (DEBUG()) console.warn(`Failed to add track ${tracks[i].id}:`, e);
+                }
+                if (i % 10 === 9) setStatusText(`🤖 Adding tracks (${i + 1}/${tracks.length})…`);
             }
 
             await refreshState(true);
             setStatusText(`🤖 Added ${tracks.length} AI tracks to queue`);
         } catch (e) {
             setStatusText(`AI error: ${e.message}`);
-            console.error('AI playlist error:', e);
+            console.error('AI playlist error:', e, e.stack);
         } finally {
             setAiGenerating(false);
         }
