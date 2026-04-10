@@ -98,6 +98,17 @@ export async function getRandomSongFromServer() {
     return song;
 }
 
+export async function getRandomSongs(count = 100) {
+    if (!isSessionValid()) throw new Error('Not authenticated');
+    const url = `${config.serverUrl}/rest/getRandomSongs?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&size=${count}`;
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
+    const data = await res.json();
+    const resp = data?.['subsonic-response'];
+    if (resp?.status !== 'ok') throw new Error(`API failed: ${resp?.error?.message || 'Unknown error'}`);
+    return Array.isArray(resp.randomSongs?.song) ? resp.randomSongs.song : resp.randomSongs?.song ? [resp.randomSongs.song] : [];
+}
+
 export async function addRandomSong() {
     const randomSong = await getRandomSongFromServer();
     const resp = await callJukebox('add', `&id=${encodeURIComponent(randomSong.id)}`);
@@ -112,6 +123,21 @@ export async function searchSongs(query) {
     if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
     const data = await res.json();
     return data?.['subsonic-response']?.searchResult3?.song || [];
+}
+
+export async function searchSongsByArtist(artistName, count = 200) {
+    if (!isSessionValid()) throw new Error('Not authenticated');
+    const url = `${config.serverUrl}/rest/search3?u=${encodeURIComponent(config.username)}&t=${config.token}&s=${config.salt}&v=${API_VERSION}&c=ModernJukebox&f=json&query=${encodeURIComponent(artistName)}&songCount=${count}&artistCount=0&albumCount=0`;
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) { clearSession(); throw new Error('Authentication failed'); }
+    const data = await res.json();
+    const songs = data?.['subsonic-response']?.searchResult3?.song || [];
+    // Post-filter: only keep songs where artist matches (case-insensitive)
+    const normalizedQuery = artistName.toLowerCase().replace(/^the\s+/, '');
+    return songs.filter(s => {
+        const normalizedArtist = (s.artist || '').toLowerCase().replace(/^the\s+/, '');
+        return normalizedArtist === normalizedQuery || normalizedArtist.includes(normalizedQuery) || normalizedQuery.includes(normalizedArtist);
+    });
 }
 
 export async function scrobble(id, submission = false) {
@@ -132,6 +158,18 @@ export async function scrobble(id, submission = false) {
 }
 
 export function getConfig() { return { serverUrl: config.serverUrl, username: config.username }; }
+
+// AI config stored in localStorage
+export function getAiConfig() {
+    return JSON.parse(localStorage.getItem(cacheKey('ai_config'))) || { lastfmApiKey: '', lastfmUsername: '', anthropicApiKey: '' };
+}
+
+export function setAiConfig(fields) {
+    const current = getAiConfig();
+    const updated = { ...current, ...fields };
+    localStorage.setItem(cacheKey('ai_config'), JSON.stringify(updated));
+    return updated;
+}
 
 export async function authenticate(serverUrl, username, password) {
     if (!username || !password) throw new Error('Username and password are required');

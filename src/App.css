@@ -83,6 +83,11 @@
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--blue-bar); }
 .btn[disabled], .btn:disabled { opacity: 0.5; pointer-events: none; transform: none; box-shadow: none; }
 .btn > svg, .btn > i, .btn > img { width: 56%; height: 56%; display: block; object-fit: contain; }
+.btn.ai { background: linear-gradient(180deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05)); border: 1px solid rgba(139,92,246,0.3); }
+.btn.ai:hover { background: linear-gradient(180deg, rgba(139,92,246,0.25), rgba(139,92,246,0.1)); }
+.btn.ai.active { animation: ai-pulse 1.5s ease-in-out infinite; box-shadow: 0 0 8px rgba(139,92,246,0.4); }
+.btn.ai:disabled { opacity: 0.5; cursor: not-allowed; }
+@keyframes ai-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 .btn.danger { border-color: var(--danger); color: var(--danger); }
 .btn.danger:hover { background: rgba(255, 0, 51, 0.15); }
 @media (max-width: 520px) { :root { --btn-size: 44px; --btn-primary-size: 56px; } .btn.compact { width: 30px; height: 30px; } .btn.shuffle, .btn.repeat { width: var(--btn-size); height: var(--btn-size); } }

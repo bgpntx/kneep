@@ -29,10 +29,15 @@ import {
     reconnect,
     isSessionValid,
     clearSession,
+    getAiConfig,
+    setAiConfig,
+    searchSongsByArtist,
+    getRandomSongs,
 } from './api/subsonic.js';
 import { fmtTime, formatDuration } from './utils/helpers.js';
 import { PlaybackStateManager } from './utils/playbackManager.js';
 import { JukeboxQueueItem } from './components/QueueItem.jsx';
+import { getTopArtists } from './api/lastfm.js';
 
 const initialState = {
     playlist: [],
@@ -48,6 +53,14 @@ const initialState = {
     lastPlayingTrackId: null, // Track the last playing track for auto-remove
 };
 
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 export default function App() {
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
@@ -56,6 +69,8 @@ export default function App() {
     const [configForm, setConfigForm] = useState({ serverUrl: '', username: '', password: '' });
     const [searchResults, setSearchResults] = useState([]);
     const [scrobbledIds, setScrobbledIds] = useState(new Set());
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [aiConfigForm, setAiConfigForm] = useState(() => getAiConfig());
 
     const commandInProgress = useRef(false);
     const stateRef = useRef(state);
@@ -367,7 +382,34 @@ export default function App() {
                 await callJukebox('clear');
                 setStatusText('Queue cleared');
             } else if (action === 'shuffle') {
-                await callJukebox('shuffle');
+                const upcoming = currentState.playlist.slice(currentState.currentIndex + 1);
+                if (upcoming.length <= 1) {
+                    setStatusText('Nothing to shuffle');
+                    return;
+                }
+
+                const wasPlaying = currentState.playing;
+                const dur = Math.max(0, currentState.playlist[currentState.currentIndex]?.duration || 0);
+                let precisePosition = currentState.position;
+                if (wasPlaying) {
+                    const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+                    precisePosition = Math.min(dur, currentState.localTickStart + dt);
+                }
+                precisePosition = Math.floor(Math.max(0, precisePosition));
+
+                const shuffled = shuffleArray([...upcoming]);
+                const newPlaylist = [...currentState.playlist.slice(0, currentState.currentIndex + 1), ...shuffled];
+
+                setState(prev => ({ ...prev, playlist: newPlaylist }));
+
+                const qs = newPlaylist.map(s => `&id=${encodeURIComponent(s.id)}`).join('');
+                await callJukebox('set', qs);
+                await new Promise(resolve => setTimeout(resolve, 50));
+                await callJukebox('skip', `&index=${currentState.currentIndex}&offset=${precisePosition}`);
+                if (wasPlaying) {
+                    await callJukebox('start');
+                }
+                await new Promise(resolve => setTimeout(resolve, 150));
             } else if (action === 'stop') {
                 await callJukebox('stop');
                 setState(prev => ({ ...prev, playing: false }));
@@ -725,6 +767,85 @@ export default function App() {
         }
     }, [configForm, refreshState, handleTransport]);
 
+    const handleAiPlaylist = useCallback(async () => {
+        const { lastfmApiKey, lastfmUsername } = getAiConfig();
+
+        if (!lastfmApiKey || !lastfmUsername) {
+            setStatusText('AI config missing — fill in Last.fm settings below');
+            return;
+        }
+
+        setAiGenerating(true);
+        try {
+            // Step 1: Fetch top artists from Last.fm
+            setStatusText('🤖 Fetching Last.fm library…');
+            const artists = await getTopArtists(lastfmUsername, lastfmApiKey, 500);
+            if (artists.length === 0) {
+                setStatusText('No artists with 500+ scrobbles found');
+                setAiGenerating(false);
+                return;
+            }
+            if (DEBUG()) console.log(`AI: Found ${artists.length} artists with 500+ scrobbles`);
+
+            // Step 2: Search Navidrome for tracks by those artists (sequential)
+            const allTracks = [];
+            for (let i = 0; i < artists.length; i++) {
+                try {
+                    const songs = await searchSongsByArtist(artists[i].name);
+                    for (const s of songs) allTracks.push(s);
+                } catch (e) {
+                    if (DEBUG()) console.warn(`Search failed for "${artists[i].name}":`, e.message);
+                }
+                if (i % 10 === 9) setStatusText(`🤖 Scanning library (${i + 1}/${artists.length}, ${allTracks.length} tracks)…`);
+            }
+
+            if (allTracks.length === 0) {
+                setStatusText('No matching tracks found in Navidrome');
+                setAiGenerating(false);
+                return;
+            }
+            if (DEBUG()) console.log(`AI: Found ${allTracks.length} tracks from ${artists.length} artists`);
+
+            // Step 3: Shuffle and pick up to 100 tracks
+            for (let i = allTracks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allTracks[i], allTracks[j]] = [allTracks[j], allTracks[i]];
+            }
+            let selected = allTracks.slice(0, 100);
+
+            // Fill remaining slots with random songs from Navidrome
+            if (selected.length < 100) {
+                setStatusText(`🤖 Found ${selected.length} from Last.fm, filling with random…`);
+                const usedIds = new Set(selected.map(s => s.id));
+                const randoms = await getRandomSongs(200);
+                const fill = randoms.filter(s => !usedIds.has(s.id)).slice(0, 100 - selected.length);
+                selected = [...selected, ...fill];
+                if (DEBUG()) console.log(`AI: Filled ${fill.length} random tracks, total ${selected.length}`);
+            }
+
+            // Step 4: Add tracks to jukebox queue (batched)
+            setStatusText(`🤖 Adding ${selected.length} tracks…`);
+            let added = 0;
+            const addBatch = 10;
+            for (let i = 0; i < selected.length; i += addBatch) {
+                const batch = selected.slice(i, i + addBatch);
+                const results = await Promise.all(
+                    batch.map(t => callJukebox('add', `&id=${encodeURIComponent(t.id)}`).then(() => true).catch(() => false))
+                );
+                added += results.filter(Boolean).length;
+                setStatusText(`🤖 Adding tracks (${Math.min(i + addBatch, selected.length)}/${selected.length})…`);
+            }
+
+            await refreshState(true);
+            setStatusText(`🤖 Added ${added} tracks to queue`);
+        } catch (e) {
+            setStatusText(`AI error: ${e.message}`);
+            console.error('AI playlist error:', e, e.stack);
+        } finally {
+            setAiGenerating(false);
+        }
+    }, [refreshState]);
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -870,6 +991,7 @@ export default function App() {
                         </button>
                         <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
                         <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
+                        <button className={`btn ai ${aiGenerating ? 'active' : ''}`} title="AI Playlist" onClick={handleAiPlaylist} disabled={!isAuthenticated || aiGenerating}>{aiGenerating ? '⏳' : '🤖'}</button>
                         <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
                     </div>
 
@@ -969,6 +1091,13 @@ export default function App() {
                             {isAuthenticated
                                 ? '✓ Connected. Played tracks auto-removed.'
                                 : '💡 Tip: Leave Server URL empty if using the nginx proxy.'}
+                        </div>
+                    </div>
+                    <div className="config ai-config">
+                        <div className="small" style={{ marginBottom: 4 }}>🤖 AI Playlist</div>
+                        <div className="row">
+                            <input placeholder="Last.fm Username" value={aiConfigForm.lastfmUsername || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, lastfmUsername: v }; setAiConfig(u); return u; }); }} />
+                            <input placeholder="Last.fm API Key" type="password" value={aiConfigForm.lastfmApiKey || ''} onChange={(e) => { const v = e.target.value; setAiConfigForm(f => { const u = { ...f, lastfmApiKey: v }; setAiConfig(u); return u; }); }} />
                         </div>
                     </div>
                 </aside>

@@ -12,6 +12,23 @@ pipeline {
     }
 
     stages {
+        stage('Check for code changes') {
+            steps {
+                script {
+                    def changes = currentBuild.changeSets.collectMany { it.items.collectMany { item -> item.affectedFiles.collect { it.path } } }
+                    def codePatterns = ['src/', 'public/', 'package.json', 'package-lock.json', 'vite.config.js', 'Dockerfile', 'docker-compose.yml', 'nginx.default.conf', 'navidrome.toml', 'rebuild.sh']
+                    def codeChanged = changes.isEmpty() || changes.any { path ->
+                        codePatterns.any { pattern -> path.startsWith(pattern) }
+                    }
+                    if (!codeChanged) {
+                        currentBuild.result = 'NOT_BUILT'
+                        echo "No code/config changes — skipping deploy."
+                        error('Skipping deploy — no code changes')
+                    }
+                }
+            }
+        }
+
         stage('Deploy to Server') {
             steps {
                 // Ensure 'deploy-ssh' matches the ID of the SSH Key credential in Jenkins 

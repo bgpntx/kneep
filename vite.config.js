@@ -12,6 +12,16 @@ export default defineConfig({
                 target: 'http://localhost:4533',
                 changeOrigin: true,
             },
+            '/lastfm': {
+                target: 'https://ws.audioscrobbler.com/2.0',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/lastfm/, ''),
+            },
+            '/anthropic': {
+                target: 'https://api.anthropic.com',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/anthropic/, ''),
+            },
         },
     },
     build: {
