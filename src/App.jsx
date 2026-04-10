@@ -53,6 +53,14 @@ const initialState = {
     lastPlayingTrackId: null, // Track the last playing track for auto-remove
 };
 
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 export default function App() {
     const [state, setState] = useState(initialState);
     const [statusText, setStatusText] = useState('Initializing...');
@@ -374,7 +382,34 @@ export default function App() {
                 await callJukebox('clear');
                 setStatusText('Queue cleared');
             } else if (action === 'shuffle') {
-                await callJukebox('shuffle');
+                const upcoming = currentState.playlist.slice(currentState.currentIndex + 1);
+                if (upcoming.length <= 1) {
+                    setStatusText('Nothing to shuffle');
+                    return;
+                }
+
+                const wasPlaying = currentState.playing;
+                const dur = Math.max(0, currentState.playlist[currentState.currentIndex]?.duration || 0);
+                let precisePosition = currentState.position;
+                if (wasPlaying) {
+                    const dt = (Date.now() - currentState.lastStatusTs) / 1000.0;
+                    precisePosition = Math.min(dur, currentState.localTickStart + dt);
+                }
+                precisePosition = Math.floor(Math.max(0, precisePosition));
+
+                const shuffled = shuffleArray([...upcoming]);
+                const newPlaylist = [...currentState.playlist.slice(0, currentState.currentIndex + 1), ...shuffled];
+
+                setState(prev => ({ ...prev, playlist: newPlaylist }));
+
+                const qs = newPlaylist.map(s => `&id=${encodeURIComponent(s.id)}`).join('');
+                await callJukebox('set', qs);
+                await new Promise(resolve => setTimeout(resolve, 50));
+                await callJukebox('skip', `&index=${currentState.currentIndex}&offset=${precisePosition}`);
+                if (wasPlaying) {
+                    await callJukebox('start');
+                }
+                await new Promise(resolve => setTimeout(resolve, 150));
             } else if (action === 'stop') {
                 await callJukebox('stop');
                 setState(prev => ({ ...prev, playing: false }));
