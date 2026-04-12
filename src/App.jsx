@@ -867,7 +867,14 @@ export default function App() {
             }
             if (DEBUG()) console.log(`Discovery: Found ${artists.length} artists with <500 scrobbles`);
 
-            // Step 2: Search Navidrome for tracks by those artists (sequential)
+            // Shuffle artists so we get variety each time
+            for (let i = artists.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [artists[i], artists[j]] = [artists[j], artists[i]];
+            }
+
+            // Step 2: Search Navidrome for tracks, stop early once we have enough
+            const targetTracks = 300;
             const allTracks = [];
             for (let i = 0; i < artists.length; i++) {
                 try {
@@ -876,7 +883,8 @@ export default function App() {
                 } catch (e) {
                     if (DEBUG()) console.warn(`Search failed for "${artists[i].name}":`, e.message);
                 }
-                if (i % 10 === 9) setStatusText(`💎 Scanning library (${i + 1}/${artists.length}, ${allTracks.length} tracks)…`);
+                if (i % 10 === 9) setStatusText(`💎 Scanning library (${i + 1}, ${allTracks.length} tracks)…`);
+                if (allTracks.length >= targetTracks) break;
             }
 
             if (allTracks.length === 0) {

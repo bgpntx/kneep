@@ -48,7 +48,7 @@ export async function getTopArtists(username, apiKey, minPlaycount = 500) {
     return allArtists;
 }
 
-export async function getLowPlaycountArtists(username, apiKey, maxPlaycount = 500) {
+export async function getLowPlaycountArtists(username, apiKey, maxPlaycount = 500, maxArtists = 1000) {
     const allArtists = [];
     const limit = 500;
 
@@ -71,11 +71,10 @@ export async function getLowPlaycountArtists(username, apiKey, maxPlaycount = 50
 
     const totalPages = parseInt(initData.topartists?.['@attr']?.totalPages || '1', 10);
 
-    // Paginate backwards from the last page
+    // Paginate backwards from the last page, cap at maxArtists
     for (let page = totalPages; page >= 1; page--) {
         let data;
         if (page === 1 && totalPages > 1) {
-            // Reuse initial data only if we circle back to page 1
             data = initData;
         } else if (page === totalPages && totalPages === 1) {
             data = initData;
@@ -99,13 +98,12 @@ export async function getLowPlaycountArtists(username, apiKey, maxPlaycount = 50
 
         const artists = data.topartists?.artist || [];
 
-        // Process in reverse order (lowest playcount first within page)
         for (let i = artists.length - 1; i >= 0; i--) {
             const playcount = parseInt(artists[i].playcount, 10);
             if (playcount < maxPlaycount) {
                 allArtists.push({ name: artists[i].name, playcount });
+                if (allArtists.length >= maxArtists) return allArtists;
             } else {
-                // Hit artists above threshold, we're done
                 return allArtists;
             }
         }

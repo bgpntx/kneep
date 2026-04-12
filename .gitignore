@@ -31,3 +31,4 @@ npm-debug.log*
 # OS generated files
 Thumbs.db
 ehthumbs.db
+.claude/skills/kneep-dev.md
