@@ -37,7 +37,7 @@ import {
 import { fmtTime, formatDuration } from './utils/helpers.js';
 import { PlaybackStateManager } from './utils/playbackManager.js';
 import { JukeboxQueueItem } from './components/QueueItem.jsx';
-import { getTopArtists } from './api/lastfm.js';
+import { getTopArtists, getLowPlaycountArtists } from './api/lastfm.js';
 
 const initialState = {
     playlist: [],
@@ -70,6 +70,7 @@ export default function App() {
     const [searchResults, setSearchResults] = useState([]);
     const [scrobbledIds, setScrobbledIds] = useState(new Set());
     const [aiGenerating, setAiGenerating] = useState(false);
+    const [discoveryGenerating, setDiscoveryGenerating] = useState(false);
     const [aiConfigForm, setAiConfigForm] = useState(() => getAiConfig());
 
     const commandInProgress = useRef(false);
@@ -846,6 +847,85 @@ export default function App() {
         }
     }, [refreshState]);
 
+    const handleDiscoveryPlaylist = useCallback(async () => {
+        const { lastfmApiKey, lastfmUsername } = getAiConfig();
+
+        if (!lastfmApiKey || !lastfmUsername) {
+            setStatusText('AI config missing — fill in Last.fm settings below');
+            return;
+        }
+
+        setDiscoveryGenerating(true);
+        try {
+            // Step 1: Fetch low-scrobble artists from Last.fm
+            setStatusText('💎 Fetching hidden gems…');
+            const artists = await getLowPlaycountArtists(lastfmUsername, lastfmApiKey, 500);
+            if (artists.length === 0) {
+                setStatusText('No artists with <500 scrobbles found');
+                setDiscoveryGenerating(false);
+                return;
+            }
+            if (DEBUG()) console.log(`Discovery: Found ${artists.length} artists with <500 scrobbles`);
+
+            // Step 2: Search Navidrome for tracks by those artists (sequential)
+            const allTracks = [];
+            for (let i = 0; i < artists.length; i++) {
+                try {
+                    const songs = await searchSongsByArtist(artists[i].name);
+                    for (const s of songs) allTracks.push(s);
+                } catch (e) {
+                    if (DEBUG()) console.warn(`Search failed for "${artists[i].name}":`, e.message);
+                }
+                if (i % 10 === 9) setStatusText(`💎 Scanning library (${i + 1}/${artists.length}, ${allTracks.length} tracks)…`);
+            }
+
+            if (allTracks.length === 0) {
+                setStatusText('No matching tracks found in Navidrome');
+                setDiscoveryGenerating(false);
+                return;
+            }
+            if (DEBUG()) console.log(`Discovery: Found ${allTracks.length} tracks from ${artists.length} artists`);
+
+            // Step 3: Shuffle and pick up to 100 tracks
+            for (let i = allTracks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allTracks[i], allTracks[j]] = [allTracks[j], allTracks[i]];
+            }
+            let selected = allTracks.slice(0, 100);
+
+            // Fill remaining slots with random songs from Navidrome
+            if (selected.length < 100) {
+                setStatusText(`💎 Found ${selected.length} from Last.fm, filling with random…`);
+                const usedIds = new Set(selected.map(s => s.id));
+                const randoms = await getRandomSongs(200);
+                const fill = randoms.filter(s => !usedIds.has(s.id)).slice(0, 100 - selected.length);
+                selected = [...selected, ...fill];
+                if (DEBUG()) console.log(`Discovery: Filled ${fill.length} random tracks, total ${selected.length}`);
+            }
+
+            // Step 4: Add tracks to jukebox queue (batched)
+            setStatusText(`💎 Adding ${selected.length} tracks…`);
+            let added = 0;
+            const addBatch = 10;
+            for (let i = 0; i < selected.length; i += addBatch) {
+                const batch = selected.slice(i, i + addBatch);
+                const results = await Promise.all(
+                    batch.map(t => callJukebox('add', `&id=${encodeURIComponent(t.id)}`).then(() => true).catch(() => false))
+                );
+                added += results.filter(Boolean).length;
+                setStatusText(`💎 Adding tracks (${Math.min(i + addBatch, selected.length)}/${selected.length})…`);
+            }
+
+            await refreshState(true);
+            setStatusText(`💎 Added ${added} hidden gem tracks to queue`);
+        } catch (e) {
+            setStatusText(`Discovery error: ${e.message}`);
+            console.error('Discovery playlist error:', e, e.stack);
+        } finally {
+            setDiscoveryGenerating(false);
+        }
+    }, [refreshState]);
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -992,6 +1072,7 @@ export default function App() {
                         <button className="btn shuffle" title="Shuffle" onClick={() => handleTransport('shuffle')}>🔀</button>
                         <button className="btn dice" title="Add random track" onClick={() => handleTransport('addRandom')}>🎲</button>
                         <button className={`btn ai ${aiGenerating ? 'active' : ''}`} title="AI Playlist" onClick={handleAiPlaylist} disabled={!isAuthenticated || aiGenerating}>{aiGenerating ? '⏳' : '🤖'}</button>
+                        <button className={`btn ai ${discoveryGenerating ? 'active' : ''}`} title="Discovery Playlist" onClick={handleDiscoveryPlaylist} disabled={!isAuthenticated || discoveryGenerating}>{discoveryGenerating ? '⏳' : '💎'}</button>
                         <button className="btn danger" title="Clear queue" onClick={() => handleTransport('clear')}>🗑️</button>
                     </div>
 

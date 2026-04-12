@@ -23,7 +23,8 @@
       "Bash(curl -s \"https://nest.vps.pw:8443/rest/search3?u=bgpntx&t=b4403881db0ad458482fc5868a08b7ba&s=b2l1xykm1vimp26h3kq6j&v=1.16.1&c=test&f=json&query=a&artistCount=0&albumCount=0&songCount=0\")",
       "Bash(python3 -c \"import json,sys; print\\(json.dumps\\(json.load\\(sys.stdin\\), indent=2\\)\\)\")",
       "Bash(curl -s \"https://nest.vps.pw:8443/rest/getArtists?u=bgpntx&t=b4403881db0ad458482fc5868a08b7ba&s=b2l1xykm1vimp26h3kq6j&v=1.16.1&c=test&f=json\")",
-      "Bash(curl -s \"https://ws.audioscrobbler.com/2.0/?method=user.getTopArtists&user=bgpntx&api_key=22ced11be5cde13ede24f89cf8d7bb63&format=json&limit=5&period=overall\")"
+      "Bash(curl -s \"https://ws.audioscrobbler.com/2.0/?method=user.getTopArtists&user=bgpntx&api_key=22ced11be5cde13ede24f89cf8d7bb63&format=json&limit=5&period=overall\")",
+      "Bash(npm run:*)"
     ]
   }
 }

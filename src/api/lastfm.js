@@ -47,3 +47,69 @@ export async function getTopArtists(username, apiKey, minPlaycount = 500) {
 
     return allArtists;
 }
+
+export async function getLowPlaycountArtists(username, apiKey, maxPlaycount = 500) {
+    const allArtists = [];
+    const limit = 500;
+
+    // First request to get totalPages
+    const initParams = new URLSearchParams({
+        method: 'user.getTopArtists',
+        user: username,
+        api_key: apiKey,
+        format: 'json',
+        limit: String(limit),
+        page: '1',
+        period: 'overall',
+    });
+
+    const initRes = await fetch(`${LASTFM_PROXY}?${initParams}`);
+    if (!initRes.ok) throw new Error(`Last.fm API error: ${initRes.status}`);
+
+    const initData = await initRes.json();
+    if (initData.error) throw new Error(`Last.fm: ${initData.message}`);
+
+    const totalPages = parseInt(initData.topartists?.['@attr']?.totalPages || '1', 10);
+
+    // Paginate backwards from the last page
+    for (let page = totalPages; page >= 1; page--) {
+        let data;
+        if (page === 1 && totalPages > 1) {
+            // Reuse initial data only if we circle back to page 1
+            data = initData;
+        } else if (page === totalPages && totalPages === 1) {
+            data = initData;
+        } else {
+            const params = new URLSearchParams({
+                method: 'user.getTopArtists',
+                user: username,
+                api_key: apiKey,
+                format: 'json',
+                limit: String(limit),
+                page: String(page),
+                period: 'overall',
+            });
+
+            const res = await fetch(`${LASTFM_PROXY}?${params}`);
+            if (!res.ok) throw new Error(`Last.fm API error: ${res.status}`);
+
+            data = await res.json();
+            if (data.error) throw new Error(`Last.fm: ${data.message}`);
+        }
+
+        const artists = data.topartists?.artist || [];
+
+        // Process in reverse order (lowest playcount first within page)
+        for (let i = artists.length - 1; i >= 0; i--) {
+            const playcount = parseInt(artists[i].playcount, 10);
+            if (playcount < maxPlaycount) {
+                allArtists.push({ name: artists[i].name, playcount });
+            } else {
+                // Hit artists above threshold, we're done
+                return allArtists;
+            }
+        }
+    }
+
+    return allArtists;
+}
