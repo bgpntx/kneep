@@ -18,6 +18,7 @@ A retro-styled web interface for controlling [Navidrome](https://www.navidrome.o
 - **Library Search** — Real-time search, click to add
 - **Random Song** — Add random tracks with one click
 - **🤖 AI Playlist** — Generate 100-track queue from your Last.fm top artists (500+ scrobbles)
+- **💎 Discovery Playlist** — Hidden gems: 100 random tracks from artists with <500 scrobbles
 - **Last.fm Scrobbling** — Automatic scrobble with tab-hidden catch-up
 - **Album Art** — High-quality cover art display
 - **Media Session API** — Control from OS media keys / lock screen
@@ -85,7 +86,7 @@ kneep/
 ├── src/
 │   ├── api/
 │   │   ├── subsonic.js        # Subsonic API client (auth, jukebox, scrobble)
-│   │   └── lastfm.js          # Last.fm API client (top artists)
+│   │   └── lastfm.js          # Last.fm API client (top artists, discovery)
 │   ├── components/
 │   │   └── QueueItem.jsx      # Drag & drop queue item
 │   ├── utils/
@@ -141,7 +142,9 @@ The 🤖 button generates a 100-track queue from your Last.fm listening history.
 1. **Last.fm Username** — your Last.fm profile name
 2. **Last.fm API Key** — get one at [last.fm/api](https://www.last.fm/api/account/create)
 
-The feature fetches your top artists with 500+ scrobbles, finds their tracks in Navidrome, and randomly picks 100 to add to the queue.
+The 🤖 feature fetches your top artists with 500+ scrobbles, finds their tracks in Navidrome, and randomly picks 100 to add to the queue.
+
+The 💎 Discovery button does the inverse — it picks from artists with fewer than 500 scrobbles, surfacing tracks you rarely listen to.
 
 ### Navidrome (`navidrome.toml`)
 
